@@ -6,8 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth";
 
 export const authOptions = {
-  debug: true, // IMPORTANT: makes NextAuth print useful logs
-
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -17,51 +15,64 @@ export const authOptions = {
       },
 
       async authorize(credentials) {
-        const username = (credentials?.username || "").trim();
-        const password = (credentials?.password || "").trim();
-
-        if (!username || !password) {
-          throw new Error("MISSING_CREDS");
+        if (!credentials?.username || !credentials?.password) {
+          return null;
         }
 
-        // TEMP: disable rate limit while debugging (we’ll re-enable after)
-        // const { rateLimit } = await import("@/lib/rateLimiter");
-        // const limitCheck = rateLimit(username);
-        // if (!limitCheck.success) throw new Error("RATE_LIMITED");
+        const username = credentials.username.trim();
+        const password = credentials.password;
 
-        const user = await prisma.user.findUnique({ where: { username } });
+        const user = await prisma.user.findUnique({
+          where: { username },
+        });
 
         if (!user) {
-          throw new Error("NO_USER");
+          return null;
         }
 
-        const ok = await verifyPassword(password, user.password);
+        const isValid = await verifyPassword(password, user.password);
 
-        if (!ok) {
-          throw new Error("BAD_PASSWORD");
+        if (!isValid) {
+          return null;
         }
 
-        return { id: user.username, name: user.username, role: user.role };
+        return {
+          id: user.username,
+          name: user.username,
+          role: user.role,
+        };
       },
     }),
   ],
 
-  session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.role = user.role;
+      if (user) {
+        token.role = user.role;
+      }
       return token;
     },
+
     async session({ session, token }) {
-      if (session?.user) session.user.role = token.role;
+      if (session?.user) {
+        session.user.role = token.role;
+      }
       return session;
     },
   },
 
-  pages: { signIn: "/login" },
+  pages: {
+    signIn: "/login",
+  },
+
   secret: process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
+
 export { handler as GET, handler as POST };
