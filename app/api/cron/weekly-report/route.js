@@ -3,8 +3,6 @@ import { prisma } from '@/lib/prisma'
 import ExcelJS from 'exceljs'
 import nodemailer from 'nodemailer'
 import { DateTime } from 'luxon'
-import path from 'path'
-import fs from 'fs'
 
 export async function GET(request) {
   try {
@@ -19,19 +17,25 @@ export async function GET(request) {
     // Set timezone to Kamloops (Pacific Time)
     const now = DateTime.now().setZone('America/Vancouver')
     
-    // Get last Monday-Friday (last complete work week)
-    // If today is Sunday, get the Monday-Friday that just ended
-    const lastFriday = now.minus({ days: now.weekday === 7 ? 2 : now.weekday + 2 }).startOf('day')
-    const lastMonday = lastFriday.minus({ days: 4 }).startOf('day')
+    // Get the current week's Monday (week that just ended)
+    // Since this runs Sunday 9 PM, we want Monday-Sunday of THIS week
+    const thisMonday = now.startOf('week') // Monday of current week
+    const thisSunday = now.startOf('week').plus({ days: 6 }) // Sunday of current week
+    
+    // Set cutoff to 8 PM on Sunday
+    const cutoffTime = thisSunday.set({ hour: 20, minute: 0, second: 0 })
 
-    console.log(`Generating report for ${lastMonday.toISODate()} to ${lastFriday.toISODate()}`)
+    console.log(`Generating report for ${thisMonday.toISODate()} to ${thisSunday.toISODate()} (cutoff: ${cutoffTime.toISO()})`)
 
-    // Fetch all work hours from Monday to Friday of last week
+    // Fetch all work hours from Monday to Sunday (up to 8 PM Sunday)
     const workHours = await prisma.workHour.findMany({
       where: {
         date: {
-          gte: lastMonday.toJSDate(),
-          lte: lastFriday.toJSDate()
+          gte: thisMonday.toJSDate(),
+          lte: thisSunday.toJSDate()
+        },
+        createdAt: {
+          lte: cutoffTime.toJSDate() // Only include entries created before 8 PM Sunday
         }
       },
       include: {
@@ -51,7 +55,7 @@ export async function GET(request) {
 
     if (workHours.length === 0) {
       // Send email saying no hours logged
-      await sendNoHoursEmail(lastMonday, lastFriday)
+      await sendNoHoursEmail(thisMonday, thisSunday)
       return NextResponse.json({ 
         success: true, 
         message: 'No hours logged this week. Email sent.' 
@@ -59,14 +63,14 @@ export async function GET(request) {
     }
 
     // Generate Excel file
-    const excelBuffer = await generateExcelReport(workHours, lastMonday, lastFriday)
+    const excelBuffer = await generateExcelReport(workHours, thisMonday, thisSunday)
 
     // Send email with Excel attachment
-    await sendReportEmail(excelBuffer, lastMonday, lastFriday)
+    await sendReportEmail(excelBuffer, thisMonday, thisSunday)
 
     return NextResponse.json({ 
       success: true, 
-      message: `Report generated and sent for ${lastMonday.toISODate()} to ${lastFriday.toISODate()}`,
+      message: `Report generated and sent for ${thisMonday.toISODate()} to ${thisSunday.toISODate()}`,
       entriesCount: workHours.length
     })
 
@@ -88,6 +92,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
   summarySheet.columns = [
     { header: 'Employee', key: 'employee', width: 25 },
     { header: 'Date', key: 'date', width: 15 },
+    { header: 'Day', key: 'day', width: 12 },
     { header: 'Projects', key: 'projects', width: 40 },
     { header: 'Hours', key: 'hours', width: 10 },
     { header: 'Description', key: 'description', width: 35 },
@@ -100,7 +105,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
   headerRow.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'FF0070C0' } // Blue header
+    fgColor: { argb: 'FF0070C0' }
   }
   headerRow.alignment = { vertical: 'middle', horizontal: 'center' }
   headerRow.height = 25
@@ -127,17 +132,19 @@ async function generateExcelReport(workHours, startDate, endDate) {
     empHeaderRow.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFE7E6E6' } // Light gray
+      fgColor: { argb: 'FFE7E6E6' }
     }
     empHeaderRow.height = 20
-    summarySheet.mergeCells(currentRow, 1, currentRow, 6)
+    summarySheet.mergeCells(currentRow, 1, currentRow, 7)
     currentRow++
 
     let employeeTotal = 0
 
     // Add entries for this employee
     for (const entry of entries) {
-      const dateStr = DateTime.fromJSDate(entry.date).toFormat('yyyy-MM-dd')
+      const entryDate = DateTime.fromJSDate(entry.date)
+      const dateStr = entryDate.toFormat('yyyy-MM-dd')
+      const dayStr = entryDate.toFormat('EEEE') // Monday, Tuesday, etc.
       
       // Parse projects
       const projects = parseProjects(entry.projects)
@@ -150,8 +157,9 @@ async function generateExcelReport(workHours, startDate, endDate) {
       // Add to summary sheet
       const row = summarySheet.getRow(currentRow)
       row.values = {
-        employee: '  ' + employeeName, // Indent
+        employee: '  ' + employeeName,
         date: dateStr,
+        day: dayStr,
         projects: projectDetails,
         hours: entry.hoursWorked,
         description: entry.description || 'N/A',
@@ -164,8 +172,15 @@ async function generateExcelReport(workHours, startDate, endDate) {
       row.height = Math.max(30, projects.length * 15)
       row.font = { size: 10 }
 
-      // Alternating row colors for readability
-      if (currentRow % 2 === 0) {
+      // Weekend highlighting (Saturday/Sunday)
+      const dayOfWeek = entryDate.weekday // 1=Monday, 7=Sunday
+      if (dayOfWeek === 6 || dayOfWeek === 7) {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFF4CC' } // Light yellow for weekends
+        }
+      } else if (currentRow % 2 === 0) {
         row.fill = {
           type: 'pattern',
           pattern: 'solid',
@@ -182,7 +197,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
             extension: 'png',
           })
           summarySheet.addImage(imageId, {
-            tl: { col: 5, row: currentRow - 1 },
+            tl: { col: 6, row: currentRow - 1 },
             ext: { width: 100, height: 40 }
           })
           row.height = Math.max(row.height, 50)
@@ -204,7 +219,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
     subtotalRow.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFFFD966' } // Yellow
+      fgColor: { argb: 'FFFFD966' }
     }
     subtotalRow.getCell('hours').font = { bold: true, size: 11, color: { argb: 'FF0070C0' } }
     currentRow++
@@ -217,6 +232,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
     const empSheet = workbook.addWorksheet(safeSheetName)
     empSheet.columns = [
       { header: 'Date', key: 'date', width: 15 },
+      { header: 'Day', key: 'day', width: 12 },
       { header: 'Projects', key: 'projects', width: 40 },
       { header: 'Hours', key: 'hours', width: 10 },
       { header: 'Description', key: 'description', width: 35 },
@@ -239,13 +255,15 @@ async function generateExcelReport(workHours, startDate, endDate) {
     const nameRow = empSheet.getRow(1)
     nameRow.font = { bold: true, size: 14 }
     nameRow.height = 30
-    empSheet.mergeCells(1, 1, 1, 5)
+    empSheet.mergeCells(1, 1, 1, 6)
 
-    let empRowNum = 3 // Start after name and header
+    let empRowNum = 3
 
     // Add entries to employee sheet
     for (const entry of entries) {
-      const dateStr = DateTime.fromJSDate(entry.date).toFormat('yyyy-MM-dd')
+      const entryDate = DateTime.fromJSDate(entry.date)
+      const dateStr = entryDate.toFormat('yyyy-MM-dd')
+      const dayStr = entryDate.toFormat('EEEE')
       const projects = parseProjects(entry.projects)
       const projectDetails = projects.length > 0
         ? projects.map(p => `• ${p.name} (${p.hours || 0}h) @ ${p.location || 'N/A'}`).join('\n')
@@ -254,6 +272,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
       const empRow = empSheet.getRow(empRowNum)
       empRow.values = {
         date: dateStr,
+        day: dayStr,
         projects: projectDetails,
         hours: entry.hoursWorked,
         description: entry.description || 'N/A',
@@ -264,8 +283,15 @@ async function generateExcelReport(workHours, startDate, endDate) {
       empRow.getCell('description').alignment = { wrapText: true, vertical: 'top' }
       empRow.height = Math.max(30, projects.length * 15)
 
-      // Alternating colors
-      if (empRowNum % 2 === 0) {
+      // Weekend highlighting
+      const dayOfWeek = entryDate.weekday
+      if (dayOfWeek === 6 || dayOfWeek === 7) {
+        empRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFF4CC' }
+        }
+      } else if (empRowNum % 2 === 0) {
         empRow.fill = {
           type: 'pattern',
           pattern: 'solid',
@@ -273,7 +299,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
         }
       }
 
-      // Add signature to employee sheet
+      // Add signature
       if (entry.signature && entry.signature.startsWith('data:image')) {
         try {
           const base64Data = entry.signature.split(',')[1]
@@ -282,7 +308,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
             extension: 'png',
           })
           empSheet.addImage(imageId, {
-            tl: { col: 4, row: empRowNum - 1 },
+            tl: { col: 5, row: empRowNum - 1 },
             ext: { width: 100, height: 40 }
           })
           empRow.height = Math.max(empRow.height, 50)
@@ -359,15 +385,18 @@ async function sendReportEmail(excelBuffer, startDate, endDate) {
     from: process.env.EMAIL_USER,
     to: process.env.REPORT_RECIPIENT || 'employee.hodder@gmail.com',
     subject: `Weekly Work Hours Report: ${startDate.toFormat('MMM dd')} - ${endDate.toFormat('MMM dd, yyyy')}`,
-    text: `Attached is the weekly work hours report for the week of ${startDate.toFormat('MMMM dd')} to ${endDate.toFormat('MMMM dd, yyyy')}.\n\nThis report includes all employee hours logged during this period.`,
+    text: `Attached is the weekly work hours report for the week of ${startDate.toFormat('MMMM dd')} to ${endDate.toFormat('MMMM dd, yyyy')} (Monday-Sunday).\n\nThis report includes all employee hours logged during this period (up to 8 PM Sunday).`,
     html: `
       <h2>Weekly Work Hours Report</h2>
-      <p><strong>Period:</strong> ${startDate.toFormat('MMMM dd')} - ${endDate.toFormat('MMMM dd, yyyy')}</p>
+      <p><strong>Period:</strong> ${startDate.toFormat('MMMM dd')} - ${endDate.toFormat('MMMM dd, yyyy')} (Monday-Sunday)</p>
+      <p><strong>Cutoff:</strong> Sunday 8:00 PM</p>
       <p>Attached is the Excel report containing all employee hours for this week.</p>
       <p>The report includes:</p>
       <ul>
         <li>Summary sheet with all employees</li>
         <li>Individual sheets for each employee</li>
+        <li>Day of week for each entry</li>
+        <li>Weekend entries highlighted in yellow</li>
         <li>Digital signatures (where provided)</li>
         <li>Project details and descriptions</li>
       </ul>
@@ -395,10 +424,10 @@ async function sendNoHoursEmail(startDate, endDate) {
     from: process.env.EMAIL_USER,
     to: process.env.REPORT_RECIPIENT || 'employee.hodder@gmail.com',
     subject: `Weekly Work Hours Report: ${startDate.toFormat('MMM dd')} - ${endDate.toFormat('MMM dd, yyyy')} - NO HOURS LOGGED`,
-    text: `No work hours were logged for the week of ${startDate.toFormat('MMMM dd')} to ${endDate.toFormat('MMMM dd, yyyy')}.`,
+    text: `No work hours were logged for the week of ${startDate.toFormat('MMMM dd')} to ${endDate.toFormat('MMMM dd, yyyy')} (Monday-Sunday).`,
     html: `
       <h2>Weekly Work Hours Report</h2>
-      <p><strong>Period:</strong> ${startDate.toFormat('MMMM dd')} - ${endDate.toFormat('MMMM dd, yyyy')}</p>
+      <p><strong>Period:</strong> ${startDate.toFormat('MMMM dd')} - ${endDate.toFormat('MMMM dd, yyyy')} (Monday-Sunday)</p>
       <p><strong style="color: red;">NO HOURS WERE LOGGED THIS WEEK</strong></p>
     `
   })
