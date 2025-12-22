@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  username String @id
+  password String
+  role     String @default("user")
+}
+
+model Employee {
+  id                      String      @id
+  name                    String      @unique
+  signature               String?
+  lastLogged              DateTime?   @map("last_logged")
+  fullName                String?     @map("full_name")
+  dob                     DateTime?
+  email                   String?
+  pronouns                String?
+  department              String?
+  title                   String?
+  tshirtSize              String?     @map("tshirt_size")
+  emergencyContactName    String?     @map("emergency_contact_name")
+  emergencyContactPhone   String?     @map("emergency_contact_phone")
+  workHours               WorkHour[]
+
+  @@map("employees")
+}
+
+model WorkHour {
+  id            Int       @id @default(autoincrement())
+  employeeId    String    @map("employee_id")
+  date          DateTime
+  projects      String?
+  hoursWorked   Float     @default(0) @map("hours_worked")
+  location      String?
+  description   String?
+  signature     String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+
+  @@map("WorkHours")
+}
