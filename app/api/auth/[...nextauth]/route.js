@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth";
 
 export const authOptions = {
+  debug: true, // IMPORTANT: makes NextAuth print useful logs
+
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -15,87 +17,51 @@ export const authOptions = {
       },
 
       async authorize(credentials) {
-        console.log("AUTH 🔐 incoming credentials");
+        const username = (credentials?.username || "").trim();
+        const password = (credentials?.password || "").trim();
 
-        if (!credentials?.username || !credentials?.password) {
-          console.log("AUTH ❌ missing credentials");
-          return null;
+        if (!username || !password) {
+          throw new Error("MISSING_CREDS");
         }
 
-        const username = credentials.username.trim();
-        const password = credentials.password;
+        // TEMP: disable rate limit while debugging (we’ll re-enable after)
+        // const { rateLimit } = await import("@/lib/rateLimiter");
+        // const limitCheck = rateLimit(username);
+        // if (!limitCheck.success) throw new Error("RATE_LIMITED");
 
-        console.log("AUTH 👤 username:", username);
-
-        // Rate limiting
-        const { rateLimit } = await import("@/lib/rateLimiter");
-        const limitCheck = rateLimit(username);
-        console.log("AUTH ⏱ rateLimit:", limitCheck);
-
-        if (!limitCheck.success) {
-          throw new Error(limitCheck.message);
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { username },
-        });
-
-        console.log("AUTH 📦 user found:", !!user);
+        const user = await prisma.user.findUnique({ where: { username } });
 
         if (!user) {
-          console.log("AUTH ❌ user not found in DB");
-          return null;
+          throw new Error("NO_USER");
         }
 
-        console.log("AUTH 🔑 hash prefix:", user.password.slice(0, 10));
+        const ok = await verifyPassword(password, user.password);
 
-        const isValid = await verifyPassword(password, user.password);
-        console.log("AUTH ✅ password match:", isValid);
-
-        if (!isValid) {
-          console.log("AUTH ❌ password mismatch");
-          return null;
+        if (!ok) {
+          throw new Error("BAD_PASSWORD");
         }
 
-        console.log("AUTH 🎉 success");
-
-        return {
-          id: user.username,
-          name: user.username,
-          role: user.role,
-        };
+        return { id: user.username, name: user.username, role: user.role };
       },
     }),
   ],
 
-  session: {
-    strategy: "jwt",
-    maxAge: 24 * 60 * 60,
-  },
+  session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.role = user.role;
-      }
+      if (user) token.role = user.role;
       return token;
     },
-
     async session({ session, token }) {
-      if (session?.user) {
-        session.user.role = token.role;
-      }
+      if (session?.user) session.user.role = token.role;
       return session;
     },
   },
 
-  pages: {
-    signIn: "/login",
-  },
-
+  pages: { signIn: "/login" },
   secret: process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };
