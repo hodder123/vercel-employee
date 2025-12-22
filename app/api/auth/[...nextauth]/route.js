@@ -1,7 +1,7 @@
-import NextAuth from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { prisma } from "@/lib/prisma"
-import { verifyPassword } from "@/lib/auth"
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/auth";
 
 export const authOptions = {
   providers: [
@@ -9,66 +9,91 @@ export const authOptions = {
       name: "Credentials",
       credentials: {
         username: { label: "Username", type: "text" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
+
       async authorize(credentials) {
+        console.log("AUTH 🔐 incoming credentials");
+
         if (!credentials?.username || !credentials?.password) {
-          return null
+          console.log("AUTH ❌ missing credentials");
+          return null;
         }
 
+        const username = credentials.username.trim();
+        const password = credentials.password;
+
+        console.log("AUTH 👤 username:", username);
+
         // Rate limiting
-        const { rateLimit } = await import('@/lib/rateLimiter')
-        const limitCheck = rateLimit(credentials.username)
+        const { rateLimit } = await import("@/lib/rateLimiter");
+        const limitCheck = rateLimit(username);
+        console.log("AUTH ⏱ rateLimit:", limitCheck);
+
         if (!limitCheck.success) {
-          throw new Error(limitCheck.message)
+          throw new Error(limitCheck.message);
         }
 
         const user = await prisma.user.findUnique({
-          where: { username: credentials.username }
-        })
-        
+          where: { username },
+        });
+
+        console.log("AUTH 📦 user found:", !!user);
+
         if (!user) {
-          return null
+          console.log("AUTH ❌ user not found in DB");
+          return null;
         }
 
-        const isValid = await verifyPassword(credentials.password, user.password)
+        console.log("AUTH 🔑 hash prefix:", user.password.slice(0, 10));
+
+        const isValid = await verifyPassword(password, user.password);
+        console.log("AUTH ✅ password match:", isValid);
 
         if (!isValid) {
-          return null
+          console.log("AUTH ❌ password mismatch");
+          return null;
         }
+
+        console.log("AUTH 🎉 success");
 
         return {
           id: user.username,
           name: user.username,
-          role: user.role
-        }
-      }
-    })
+          role: user.role,
+        };
+      },
+    }),
   ],
+
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: 24 * 60 * 60,
   },
+
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role
+        token.role = user.role;
       }
-      return token
+      return token;
     },
+
     async session({ session, token }) {
       if (session?.user) {
-        session.user.role = token.role
+        session.user.role = token.role;
       }
-      return session
-    }
+      return session;
+    },
   },
+
   pages: {
-    signIn: '/login',
+    signIn: "/login",
   },
+
   secret: process.env.NEXTAUTH_SECRET,
-}
+};
 
-const handler = NextAuth(authOptions)
+const handler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST }
+export { handler as GET, handler as POST };
