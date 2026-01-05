@@ -12,7 +12,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-  const body = await request.json()
+    const body = await request.json()
     const { employeeId, date, signature } = body
     const projects = sanitizeObject(body.projects)
 
@@ -21,7 +21,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-     // SERVER-SIDE DATE VALIDATION - Only today or yesterday
+    // SERVER-SIDE DATE VALIDATION - Only today or yesterday
     const submittedDate = new Date(date)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -44,7 +44,7 @@ export async function POST(request) {
     const existing = await prisma.workHour.findFirst({
       where: {
         employeeId: employeeId,
-        date: new Date(date)
+        date: new Date(date + 'T12:00:00-08:00') // FIXED: Use noon PST
       }
     })
 
@@ -69,16 +69,16 @@ export async function POST(request) {
       return NextResponse.json(updated)
     } else {
       // Create new entry
-    const newEntry = await prisma.workHour.create({
-  data: {
-    employeeId: employeeId,
-    date: new Date(date),
-    projects: JSON.stringify(projects),
-    hoursWorked: totalHours,
-    description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),
-    signature: signature || null
-  }
-})
+      const newEntry = await prisma.workHour.create({
+        data: {
+          employeeId: employeeId,
+          date: new Date(date + 'T12:00:00-08:00'), // FIXED: Use noon PST
+          projects: JSON.stringify(projects),
+          hoursWorked: totalHours,
+          description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),
+          signature: signature || null
+        }
+      })
 
       return NextResponse.json(newEntry)
     }
