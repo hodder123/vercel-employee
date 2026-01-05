@@ -142,7 +142,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
 
     // Add entries for this employee
     for (const entry of entries) {
-      const entryDate = DateTime.fromJSDate(entry.date)
+      const entryDate = DateTime.fromJSDate(entry.date).setZone('America/Vancouver')  // ← ADD .setZone()
       const dateStr = entryDate.toFormat('yyyy-MM-dd')
       const dayStr = entryDate.toFormat('EEEE') // Monday, Tuesday, etc.
       
@@ -261,7 +261,7 @@ async function generateExcelReport(workHours, startDate, endDate) {
 
     // Add entries to employee sheet
     for (const entry of entries) {
-      const entryDate = DateTime.fromJSDate(entry.date)
+      const entryDate = DateTime.fromJSDate(entry.date).setZone('America/Vancouver')  // ← ADD .setZone()
       const dateStr = entryDate.toFormat('yyyy-MM-dd')
       const dayStr = entryDate.toFormat('EEEE')
       const projects = parseProjects(entry.projects)

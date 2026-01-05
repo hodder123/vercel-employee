@@ -54,7 +54,7 @@ export async function PUT(request, { params }) {
     const updated = await prisma.workHour.update({
       where: { id: parseInt(id) },
       data: {
-        date: new Date(date),
+        date: new Date(date + 'T12:00:00-08:00'),
         projects: JSON.stringify(projects),
         hoursWorked: totalHours,
         description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; ')

@@ -96,7 +96,8 @@ export default function EmployeeHoursDetail({ employee, workHours }) {
                           weekday: 'long',
                           year: 'numeric',
                           month: 'long',
-                          day: 'numeric'
+                          day: 'numeric',
+                          timeZone: 'America/Los_Angeles'
                         })}
                       </p>
                       <p className="text-sm text-gray-600 mt-1">

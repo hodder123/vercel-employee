@@ -153,7 +153,7 @@ export default async function AdminAllWorkHoursPage() {
                         <div className="text-center hidden sm:block">
                           <p className="text-xs text-gray-500">Last Entry</p>
                           <p className="text-sm font-medium text-gray-900">
-                            {new Date(employee.lastEntry).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {new Date(employee.lastEntry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles'})}
                           </p>
                         </div>
                       )}

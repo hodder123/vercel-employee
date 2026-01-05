@@ -43,6 +43,7 @@ export default function WorkHoursList({ workHours = [], role }) {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
+                    timeZone: 'America/Los_Angeles'
                   })}
                 </p>
                 <p className="text-sm text-gray-600">

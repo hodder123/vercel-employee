@@ -77,9 +77,11 @@ export default async function UserEditHoursPage({ params }) {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Edit Work Hours</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {new Date(workHour.date).toLocaleDateString()} • {timeRemaining.toFixed(1)} hours left to edit
-              </p>
+             <p className="text-sm text-gray-600 mt-1">
+  {new Date(workHour.date).toLocaleDateString('en-US', { 
+    timeZone: 'America/Los_Angeles' 
+  })} • {timeRemaining.toFixed(1)} hours left to edit
+</p>
             </div>
             <a 
               href="/work-hours"

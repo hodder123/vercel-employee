@@ -48,12 +48,14 @@ export default async function EditHoursPage({ params }) {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Edit Work Hours</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {workHour.employee?.fullName || workHour.employee?.name} • {new Date(workHour.date).toLocaleDateString()}
-              </p>
-            </div>
+         <div>
+  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Edit Work Hours</h1>
+  <p className="text-sm text-gray-600 mt-1">
+    {workHour.employee?.fullName || workHour.employee?.name} • {new Date(workHour.date).toLocaleDateString('en-US', { 
+      timeZone: 'America/Los_Angeles' 
+    })}
+  </p>
+</div>
             <a 
               href={`/admin/employee/${workHour.employeeId}`}
               className="text-blue-600 hover:text-blue-700 font-medium text-sm"
