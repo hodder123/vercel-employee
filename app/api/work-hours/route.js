@@ -21,17 +21,19 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // SERVER-SIDE DATE VALIDATION - Only today or yesterday
-    const submittedDate = new Date(date)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
+    // SERVER-SIDE DATE VALIDATION - Only today or yesterday IN PST
+    const submittedDate = new Date(date + 'T12:00:00-08:00')
 
-    submittedDate.setHours(0, 0, 0, 0)
+    // Get today and yesterday in PST
+    const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+    const todayPST = new Date(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate())
+    const yesterdayPST = new Date(todayPST)
+    yesterdayPST.setDate(yesterdayPST.getDate() - 1)
 
-    if (submittedDate < yesterday || submittedDate > today) {
+    // Compare dates only (ignore time)
+    const submittedDateOnly = new Date(submittedDate.getFullYear(), submittedDate.getMonth(), submittedDate.getDate())
+
+    if (submittedDateOnly < yesterdayPST || submittedDateOnly > todayPST) {
       return NextResponse.json({ 
         error: 'You can only log hours for today or yesterday' 
       }, { status: 400 })

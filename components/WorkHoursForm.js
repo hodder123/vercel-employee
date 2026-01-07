@@ -6,13 +6,16 @@ import SignatureCanvas from 'react-signature-canvas'
 
 export default function WorkHoursForm({ employeeId, employeeName }) {
   const router = useRouter()
-const sigCanvas = useRef(null)
+  const sigCanvas = useRef(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasSigned, setHasSigned] = useState(false)
   
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: (() => {
+      const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+      return nowPST.toISOString().split('T')[0]
+    })(),
     projects: [
       { name: '', location: '', hours: '', description: '' }
     ]
@@ -41,7 +44,7 @@ const sigCanvas = useRef(null)
     setHasSigned(false)
   }
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -83,7 +86,10 @@ const handleSubmit = async (e) => {
 
       // Reset form
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: (() => {
+          const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+          return nowPST.toISOString().split('T')[0]
+        })(),
         projects: [{ name: '', location: '', hours: '', description: '' }]
       })
       clearSignature()
@@ -104,7 +110,7 @@ const handleSubmit = async (e) => {
         </div>
       )}
 
-{/* Date */}
+      {/* Date */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Date (Today or Yesterday Only)
@@ -114,11 +120,15 @@ const handleSubmit = async (e) => {
           value={formData.date}
           onChange={(e) => setFormData({ ...formData, date: e.target.value })}
           min={(() => {
-            const yesterday = new Date()
-            yesterday.setDate(yesterday.getDate() - 1)
-            return yesterday.toISOString().split('T')[0]
+            const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+            const yesterdayPST = new Date(nowPST)
+            yesterdayPST.setDate(yesterdayPST.getDate() - 1)
+            return yesterdayPST.toISOString().split('T')[0]
           })()}
-          max={new Date().toISOString().split('T')[0]}
+          max={(() => {
+            const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+            return nowPST.toISOString().split('T')[0]
+          })()}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           required
         />
