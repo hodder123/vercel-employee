@@ -22,18 +22,14 @@ export async function POST(request) {
     }
 
     // SERVER-SIDE DATE VALIDATION - Only today or yesterday IN PST
-    const submittedDate = new Date(date + 'T12:00:00-08:00')
-
     // Get today and yesterday in PST
-    const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
-    const todayPST = new Date(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate())
-    const yesterdayPST = new Date(todayPST)
-    yesterdayPST.setDate(yesterdayPST.getDate() - 1)
+    const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
+    const yesterdayDate = new Date(todayPST)
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterdayPST = yesterdayDate.toISOString().split('T')[0]
 
-    // Compare dates only (ignore time)
-    const submittedDateOnly = new Date(submittedDate.getFullYear(), submittedDate.getMonth(), submittedDate.getDate())
-
-    if (submittedDateOnly < yesterdayPST || submittedDateOnly > todayPST) {
+    // Validate submitted date is today or yesterday
+    if (date !== todayPST && date !== yesterdayPST) {
       return NextResponse.json({ 
         error: 'You can only log hours for today or yesterday' 
       }, { status: 400 })
@@ -46,7 +42,7 @@ export async function POST(request) {
     const existing = await prisma.workHour.findFirst({
       where: {
         employeeId: employeeId,
-        date: new Date(date + 'T12:00:00-08:00') // FIXED: Use noon PST
+        date: new Date(date + 'T12:00:00-08:00')
       }
     })
 
@@ -74,7 +70,7 @@ export async function POST(request) {
       const newEntry = await prisma.workHour.create({
         data: {
           employeeId: employeeId,
-          date: new Date(date + 'T12:00:00-08:00'), // FIXED: Use noon PST
+          date: new Date(date + 'T12:00:00-08:00'),
           projects: JSON.stringify(projects),
           hoursWorked: totalHours,
           description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),

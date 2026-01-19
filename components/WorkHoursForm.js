@@ -12,10 +12,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   const [hasSigned, setHasSigned] = useState(false)
   
   const [formData, setFormData] = useState({
-    date: (() => {
-      const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
-      return nowPST.toISOString().split('T')[0]
-    })(),
+    date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
     projects: [
       { name: '', location: '', hours: '', description: '' }
     ]
@@ -86,10 +83,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
 
       // Reset form
       setFormData({
-        date: (() => {
-          const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
-          return nowPST.toISOString().split('T')[0]
-        })(),
+        date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
         projects: [{ name: '', location: '', hours: '', description: '' }]
       })
       clearSignature()
@@ -100,6 +94,18 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Get PST dates for min/max
+  const getTodayPST = () => {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
+  }
+
+  const getYesterdayPST = () => {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
+    const todayDate = new Date(today)
+    todayDate.setDate(todayDate.getDate() - 1)
+    return todayDate.toISOString().split('T')[0]
   }
 
   return (
@@ -119,16 +125,8 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
           type="date"
           value={formData.date}
           onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-          min={(() => {
-            const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
-            const yesterdayPST = new Date(nowPST)
-            yesterdayPST.setDate(yesterdayPST.getDate() - 1)
-            return yesterdayPST.toISOString().split('T')[0]
-          })()}
-          max={(() => {
-            const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
-            return nowPST.toISOString().split('T')[0]
-          })()}
+          min={getYesterdayPST()}
+          max={getTodayPST()}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           required
         />
