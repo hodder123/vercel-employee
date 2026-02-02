@@ -3,27 +3,22 @@ import { authOptions } from '../../../api/auth/[...nextauth]/route'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import EditHoursForm from '@/components/EditHoursForm'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 export default async function EditHoursPage({ params }) {
   const session = await getServerSession(authOptions)
-  
+
   if (!session || session.user.role !== 'admin') {
     redirect('/dashboard')
   }
 
   const { id } = await params
-
-  // Get work hour entry
   const workHour = await prisma.workHour.findUnique({
     where: { id: parseInt(id) },
     include: {
-      employee: {
-        select: {
-          id: true,
-          name: true,
-          fullName: true
-        }
-      }
+      employee: { select: { id: true, name: true, fullName: true } }
     }
   })
 
@@ -33,49 +28,29 @@ export default async function EditHoursPage({ params }) {
 
   const parseProjects = (projects) => {
     try {
-      if (typeof projects === 'string') {
-        return JSON.parse(projects)
-      }
+      if (typeof projects === 'string') return JSON.parse(projects)
       return projects || []
-    } catch {
-      return []
-    }
+    } catch { return [] }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-         <div>
-  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Edit Work Hours</h1>
-  <p className="text-sm text-gray-600 mt-1">
-    {workHour.employee?.fullName || workHour.employee?.name} • {new Date(workHour.date).toLocaleDateString('en-US', { 
-      timeZone: 'America/Los_Angeles' 
-    })}
-  </p>
-</div>
-            <a 
-              href={`/admin/employee/${workHour.employeeId}`}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-            >
-              ← Back to Employee
-            </a>
-          </div>
-        </div>
-      </header>
+    <div className="max-w-2xl space-y-6">
+      <Link href={`/admin/employee/${workHour.employeeId}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to {workHour.employee?.fullName || workHour.employee?.name}
+      </Link>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-          <EditHoursForm 
-            workHour={{
-              ...workHour,
-              projects: parseProjects(workHour.projects)
-            }} 
-          />
-        </div>
-      </main>
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Work Hours</CardTitle>
+          <CardDescription>
+            {workHour.employee?.fullName || workHour.employee?.name} &middot; {new Date(workHour.date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EditHoursForm workHour={{ ...workHour, projects: parseProjects(workHour.projects) }} />
+        </CardContent>
+      </Card>
     </div>
   )
 }

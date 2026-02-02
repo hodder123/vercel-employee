@@ -13,9 +13,10 @@ export async function POST(request) {
     }
 
     const { username, newPassword } = await request.json()
+    const normalizedUsername = username?.toLowerCase()
 
     // Validate
-    if (!username || !newPassword) {
+    if (!normalizedUsername || !newPassword) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -31,7 +32,7 @@ export async function POST(request) {
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { username }
+      where: { username: normalizedUsername }
     })
 
     if (!user) {
@@ -43,7 +44,7 @@ export async function POST(request) {
 
     // Update password
     await prisma.user.update({
-      where: { username },
+      where: { username: normalizedUsername },
       data: { password: hashedPassword }
     })
 

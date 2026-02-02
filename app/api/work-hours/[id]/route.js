@@ -73,11 +73,44 @@ export async function DELETE(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== 'admin') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { id } = await params
+
+    const workHour = await prisma.workHour.findUnique({
+      where: { id: parseInt(id) },
+      include: { employee: true }
+    })
+
+    if (!workHour) {
+      return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    }
+
+    const isAdmin = session.user.role === 'admin'
+    const isOwner = workHour.employee.name === session.user.name
+
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    if (!isAdmin) {
+      if (workHour.signature === 'admin-added') {
+        return NextResponse.json({ 
+          error: 'Admin-added entries cannot be deleted by users.' 
+        }, { status: 403 })
+      }
+      const createdAt = workHour.createdAt
+      const now = new Date()
+      const hoursSinceCreation = (now - new Date(createdAt)) / (1000 * 60 * 60)
+
+      if (hoursSinceCreation > 12) {
+        return NextResponse.json({ 
+          error: 'Delete window expired. You can only delete entries within 12 hours of creation.' 
+        }, { status: 403 })
+      }
+    }
 
     await prisma.workHour.delete({
       where: { id: parseInt(id) }

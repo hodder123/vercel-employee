@@ -3,173 +3,219 @@ import { authOptions } from '../../api/auth/[...nextauth]/route'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Users, FileText, Clock, CalendarDays, Plus, ChevronRight } from 'lucide-react'
 
 export default async function AdminAllWorkHoursPage() {
   const session = await getServerSession(authOptions)
-  
+
   if (!session || session.user.role !== 'admin') {
     redirect('/dashboard')
   }
 
-// Get all employees with their work hours count (exclude admin)
   const allEmployees = await prisma.employee.findMany({
-    where: {
-      id: { not: '0' } // Exclude administrator
-    },
+    where: { id: { not: '0' } },
     include: {
       workHours: {
-        select: {
-          id: true,
-          hoursWorked: true,
-          date: true
-        }
+        select: { id: true, hoursWorked: true, date: true }
       }
     }
   })
 
-  // Sort: Move Carrie, Kenzie, and Mark to bottom
-  const priorityEmployees = ['Oct-1071', 'Mar-3198', 'Jan-0161'] // Carrie, Kenzie, Mark
+  const now = new Date()
+  const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }))
+  const dayOfWeek = pstDate.getDay()
+  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const weekStart = new Date(pstDate)
+  weekStart.setDate(weekStart.getDate() - mondayOffset)
+  weekStart.setHours(0, 0, 0, 0)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 6)
+  weekEnd.setHours(23, 59, 59, 999)
+
+  const lastWeekStart = new Date(weekStart)
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7)
+  const lastWeekEnd = new Date(weekStart)
+  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1)
+  lastWeekEnd.setHours(23, 59, 59, 999)
+
+  const priorityEmployees = ['Oct-1071', 'Mar-3198', 'Jan-0161']
   const employees = allEmployees.sort((a, b) => {
     const aIsPriority = priorityEmployees.includes(a.id)
     const bIsPriority = priorityEmployees.includes(b.id)
-    
     if (aIsPriority && !bIsPriority) return 1
     if (!aIsPriority && bIsPriority) return -1
-    
-    // Both same priority level, sort by full name
     return (a.fullName || a.name).localeCompare(b.fullName || b.name)
   })
 
-  // Calculate stats for each employee
   const employeeStats = employees.map(emp => {
     const totalHours = emp.workHours.reduce((sum, wh) => sum + wh.hoursWorked, 0)
     const entriesCount = emp.workHours.length
-    const lastEntry = emp.workHours.length > 0 
+    const hoursThisWeek = emp.workHours.reduce((sum, wh) => {
+      const whDate = new Date(wh.date)
+      if (whDate >= weekStart && whDate <= weekEnd) {
+        return sum + wh.hoursWorked
+      }
+      return sum
+    }, 0)
+    const hoursLastWeek = emp.workHours.reduce((sum, wh) => {
+      const whDate = new Date(wh.date)
+      if (whDate >= lastWeekStart && whDate <= lastWeekEnd) {
+        return sum + wh.hoursWorked
+      }
+      return sum
+    }, 0)
+    const lastEntry = emp.workHours.length > 0
       ? emp.workHours.sort((a, b) => new Date(b.date) - new Date(a.date))[0].date
       : null
-
-    return {
-      ...emp,
-      totalHours,
-      entriesCount,
-      lastEntry
-    }
+    return { ...emp, totalHours, entriesCount, hoursThisWeek, hoursLastWeek, lastEntry }
   })
 
   const totalSystemHours = employeeStats.reduce((sum, emp) => sum + emp.totalHours, 0)
+  const totalThisWeekHours = employeeStats.reduce((sum, emp) => sum + emp.hoursThisWeek, 0)
+  const totalLastWeekHours = employeeStats.reduce((sum, emp) => sum + emp.hoursLastWeek, 0)
   const totalEntries = employeeStats.reduce((sum, emp) => sum + emp.entriesCount, 0)
+  const topThisWeek = [...employeeStats]
+    .sort((a, b) => b.hoursThisWeek - a.hoursThisWeek)
+    .slice(0, 6)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Employee Hours Management</h1>
-              <p className="text-sm text-gray-600 mt-1">{employees.length} employees • {totalEntries} total entries</p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+          <p className="text-muted-foreground">{employees.length} users &middot; {totalEntries} total entries</p>
+        </div>
+        <Button asChild>
+          <Link href="/admin/add-user">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Employee
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">This Week Hours</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{totalThisWeekHours.toFixed(1)}h</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Last Week Hours</CardTitle>
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{totalLastWeekHours.toFixed(1)}h</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">Total Entries</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalEntries}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">All Time Hours</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900">{totalSystemHours.toFixed(1)}h</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick View: This Week</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topThisWeek.length === 0 ? (
+            <p className="text-muted-foreground">No hours logged this week.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {topThisWeek.map((employee) => (
+                <Link
+                  key={employee.id}
+                  href={`/admin/employee/${employee.id}`}
+                  className="rounded-lg border bg-white/80 p-3 hover:shadow-sm transition-shadow"
+                >
+                  <p className="font-semibold truncate">{employee.fullName || employee.name}</p>
+                  <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{employee.entriesCount} entries</span>
+                    <span className="font-semibold text-blue-700">{employee.hoursThisWeek.toFixed(1)}h</span>
+                  </div>
+                </Link>
+              ))}
             </div>
-            <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 font-medium text-sm sm:text-base">
-              ← Back to Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
+          )}
+        </CardContent>
+      </Card>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-gray-600">Total Employees</p>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{employees.length}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-gray-600">Total Entries</p>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{totalEntries}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-gray-600">Total Hours</p>
-            <p className="text-2xl sm:text-3xl font-bold text-blue-600 mt-2">{totalSystemHours.toFixed(1)}h</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-gray-600">Avg per Employee</p>
-            <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">
-              {employees.length > 0 ? (totalSystemHours / employees.length).toFixed(1) : 0}h
-            </p>
-          </div>
-        </div>
-
-        {/* Employee Cards */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">All Employees</h2>
-            <Link
-              href="/admin/add-user"
-              className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition"
-            >
-              + Add User
-            </Link>
-          </div>
-
-          <div className="divide-y divide-gray-200">
+      <Card>
+        <CardHeader>
+          <CardTitle>All Users</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y">
             {employeeStats.map((employee) => (
               <Link
                 key={employee.id}
                 href={`/admin/employee/${employee.id}`}
-                className="block hover:bg-gray-50 transition"
+                className="flex items-center justify-between px-6 py-4 hover:bg-muted/50 transition-colors"
               >
-                <div className="px-4 sm:px-6 py-4 sm:py-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                    {/* Employee Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-blue-700 font-semibold text-sm sm:text-base">
-                            {employee.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'NA'}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm sm:text-base font-semibold text-gray-900 truncate">
-                            {employee.fullName || employee.name}
-                          </p>
-                          <p className="text-xs sm:text-sm text-gray-500 truncate">
-                            @{employee.name} • ID: {employee.id}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex items-center gap-4 sm:gap-6">
-                      <div className="text-center">
-                        <p className="text-xs text-gray-500">Entries</p>
-                        <p className="text-base sm:text-lg font-semibold text-gray-900">{employee.entriesCount}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-500">Total Hours</p>
-                        <p className="text-base sm:text-lg font-semibold text-blue-600">{employee.totalHours.toFixed(1)}h</p>
-                      </div>
-                      {employee.lastEntry && (
-                        <div className="text-center hidden sm:block">
-                          <p className="text-xs text-gray-500">Last Entry</p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {new Date(employee.lastEntry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles'})}
-                          </p>
-                        </div>
-                      )}
-                      <div className="text-gray-400">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-700 font-semibold text-sm">
+                      {employee.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'NA'}
+                    </span>
                   </div>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{employee.fullName || employee.name}</p>
+                    <p className="text-sm text-muted-foreground truncate">@{employee.name} &middot; {employee.id}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
+                  <div className="text-center hidden sm:block">
+                    <p className="text-xs text-muted-foreground">Entries</p>
+                    <p className="font-semibold">{employee.entriesCount}</p>
+                  </div>
+                  <div className="text-center hidden md:block">
+                    <p className="text-xs text-muted-foreground">This Week</p>
+                    <p className="font-semibold text-blue-700">{employee.hoursThisWeek.toFixed(1)}</p>
+                  </div>
+                  <div className="text-center hidden lg:block">
+                    <p className="text-xs text-muted-foreground">Last Week</p>
+                    <p className="font-semibold text-emerald-700">{employee.hoursLastWeek.toFixed(1)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Hours</p>
+                    <p className="font-semibold text-blue-600">{employee.totalHours.toFixed(1)}</p>
+                  </div>
+                  {employee.lastEntry && (
+                    <div className="text-center hidden md:block">
+                      <p className="text-xs text-muted-foreground">Last Entry</p>
+                      <p className="text-sm font-medium">
+                        {new Date(employee.lastEntry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}
+                      </p>
+                    </div>
+                  )}
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>
               </Link>
             ))}
           </div>
-        </div>
-      </main>
+        </CardContent>
+      </Card>
     </div>
   )
 }
