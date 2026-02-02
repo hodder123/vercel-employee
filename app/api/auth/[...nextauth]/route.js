@@ -19,11 +19,16 @@ export const authOptions = {
           return null;
         }
 
-        const username = credentials.username.trim();
+        const normalizedUsername = credentials.username.trim().toLowerCase();
         const password = credentials.password;
 
-        const user = await prisma.user.findUnique({
-          where: { username },
+        const user = await prisma.user.findFirst({
+          where: {
+            username: {
+              equals: normalizedUsername,
+              mode: "insensitive",
+            },
+          },
         });
 
         if (!user) {

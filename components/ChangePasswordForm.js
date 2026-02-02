@@ -86,7 +86,7 @@ export default function ChangePasswordForm({ employee }) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
           <strong>Password Requirements:</strong>
-          <ul className="list-disc list-inside mt-2 space-y-1">;
+          <ul className="list-disc list-inside mt-2 space-y-1">
             <li>Minimum 8 characters</li>
             <li>At least one uppercase letter</li>
             <li>At least one lowercase letter</li>
