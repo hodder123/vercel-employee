@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Users, FileText, Clock, CalendarDays, Plus, ChevronRight } from 'lucide-react'
+import ExportCsvButton from '@/components/admin/ExportCsvButton'
 
 export default async function AdminAllWorkHoursPage() {
   const session = await getServerSession(authOptions)
@@ -87,12 +88,15 @@ export default async function AdminAllWorkHoursPage() {
           <h1 className="text-2xl font-bold tracking-tight">Users</h1>
           <p className="text-muted-foreground">{employees.length} users &middot; {totalEntries} total entries</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/add-user">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Employee
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportCsvButton label="Export CSV" />
+          <Button asChild>
+            <Link href="/admin/add-user">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Employee
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

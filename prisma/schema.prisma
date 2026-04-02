@@ -42,9 +42,13 @@ model WorkHour {
   location      String?
   description   String?
   signature     String?
+  photos        String?   // JSON array of Vercel Blob URLs
+  latitude      Float?
+  longitude     Float?
+  locationName  String?   @map("location_name")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
-  
+
   employee      Employee  @relation(fields: [employeeId], references: [id])
 
   @@map("WorkHours")

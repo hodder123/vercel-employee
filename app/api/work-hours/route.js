@@ -7,38 +7,44 @@ import { sanitizeObject } from '@/lib/sanitize'
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
-    const { employeeId, date, signature } = body
+    const { employeeId, date, signature, photos, latitude, longitude, locationName } = body
     const projects = sanitizeObject(body.projects)
 
-    // Validate
+    // Validate required fields
     if (!employeeId || !date || !projects || projects.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // SERVER-SIDE DATE VALIDATION - Only today or yesterday IN PST
-    // Get today and yesterday in PST
+    // SERVER-SIDE DATE VALIDATION — only today or yesterday in PST
     const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
     const yesterdayDate = new Date(todayPST)
     yesterdayDate.setDate(yesterdayDate.getDate() - 1)
     const yesterdayPST = yesterdayDate.toISOString().split('T')[0]
 
-    // Validate submitted date is today or yesterday
     if (date !== todayPST && date !== yesterdayPST) {
-      return NextResponse.json({ 
-        error: 'You can only log hours for today or yesterday' 
+      return NextResponse.json({
+        error: 'You can only log hours for today or yesterday'
       }, { status: 400 })
     }
 
     // Calculate total hours
     const totalHours = projects.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0)
 
-    // Check if entry already exists for this date
+    // Sanitize optional fields
+    const photosJson = Array.isArray(photos) && photos.length > 0
+      ? JSON.stringify(photos)
+      : null
+    const lat = typeof latitude === 'number' ? latitude : null
+    const lng = typeof longitude === 'number' ? longitude : null
+    const locName = typeof locationName === 'string' ? locationName.slice(0, 500) : null
+
+    // Check if an entry already exists for this date
     const existing = await prisma.workHour.findFirst({
       where: {
         employeeId: employeeId,
@@ -47,12 +53,17 @@ export async function POST(request) {
     })
 
     if (existing) {
-      // Update existing entry - add new projects
-      const existingProjects = typeof existing.projects === 'string' 
-        ? JSON.parse(existing.projects) 
+      // Merge new projects into the existing entry
+      const existingProjects = typeof existing.projects === 'string'
+        ? JSON.parse(existing.projects)
         : existing.projects || []
-      
+
+      const existingPhotos = existing.photos
+        ? JSON.parse(existing.photos)
+        : []
+
       const updatedProjects = [...existingProjects, ...projects]
+      const updatedPhotos = [...existingPhotos, ...(Array.isArray(photos) ? photos : [])]
       const newTotalHours = updatedProjects.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0)
 
       const updated = await prisma.workHour.update({
@@ -60,7 +71,12 @@ export async function POST(request) {
         data: {
           projects: JSON.stringify(updatedProjects),
           hoursWorked: newTotalHours,
-          description: updatedProjects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; ')
+          description: updatedProjects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),
+          photos: updatedPhotos.length > 0 ? JSON.stringify(updatedPhotos) : existing.photos,
+          // Only update location if not already set
+          latitude: existing.latitude ?? lat,
+          longitude: existing.longitude ?? lng,
+          locationName: existing.locationName ?? locName,
         }
       })
 
@@ -74,7 +90,11 @@ export async function POST(request) {
           projects: JSON.stringify(projects),
           hoursWorked: totalHours,
           description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),
-          signature: signature || null
+          signature: signature || null,
+          photos: photosJson,
+          latitude: lat,
+          longitude: lng,
+          locationName: locName,
         }
       })
 

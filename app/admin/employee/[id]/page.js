@@ -7,6 +7,7 @@ import EmployeeHoursDetail from '@/components/EmployeeHoursDetail'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import ExportCsvButton from '@/components/admin/ExportCsvButton'
 import { Plus, KeyRound, Trash2, ArrowLeft } from 'lucide-react'
 
 export default async function EmployeeDetailPage({ params }) {
@@ -57,6 +58,7 @@ export default async function EmployeeDetailPage({ params }) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <ExportCsvButton employeeId={employee.id} label="CSV" />
               <Button size="sm" className="bg-green-600 hover:bg-green-700" asChild>
                 <Link href={`/admin/add-hours/${employee.id}`}>
                   <Plus className="h-4 w-4 mr-1" /> Add Hours
