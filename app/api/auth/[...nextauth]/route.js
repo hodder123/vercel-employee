@@ -1,5 +1,11 @@
 export const runtime = "nodejs";
 
+// On Vercel preview deployments, override NEXTAUTH_URL with the actual
+// deployment URL so login redirects work correctly on staging branches.
+if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL) {
+  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+}
+
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
