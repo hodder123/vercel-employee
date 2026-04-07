@@ -22,20 +22,28 @@ export default async function DashboardPage() {
 
   const username = session.user.name
 
-  const employee = await prisma.employee.findUnique({
-    where: { name: username }
-  })
+  let employee = null
+  let workHours = []
+  try {
+    employee = await prisma.employee.findUnique({
+      where: { name: username }
+    })
+
+    if (employee) {
+      workHours = await prisma.workHour.findMany({
+        where: { employeeId: employee.id },
+        orderBy: { date: 'desc' },
+        take: 3
+      })
+    }
+  } catch (err) {
+    console.error('[dashboard] Prisma error code:', err.code)
+    console.error('[dashboard] Prisma error message:', err.message)
+    console.error('[dashboard] Prisma meta:', JSON.stringify(err.meta))
+    throw err
+  }
 
   const fullName = employee?.fullName || username
-
-  let workHours = []
-  if (employee) {
-    workHours = await prisma.workHour.findMany({
-      where: { employeeId: employee.id },
-      orderBy: { date: 'desc' },
-      take: 3
-    })
-  }
 
   return (
     <div className="min-h-screen bg-background">
