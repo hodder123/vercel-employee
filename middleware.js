@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 export function middleware(request) {
   const host = request.headers.get("host") || "";
 
-  // Force canonical domain so NextAuth doesn't bounce between domains
-  if (host.endsWith(".vercel.app")) {
+  // Force canonical domain so NextAuth doesn't bounce between domains.
+  // Only redirect the production Vercel alias — allow preview/staging deployments through.
+  const isPreview = process.env.VERCEL_ENV === 'preview';
+  if (!isPreview && host.endsWith(".vercel.app")) {
     const url = request.nextUrl.clone();
     url.host = "employee.hodder.ca";
     url.protocol = "https:";
