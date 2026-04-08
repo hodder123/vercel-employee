@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
 import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react'
@@ -14,6 +14,15 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   const [error, setError] = useState('')
   const [hasSigned, setHasSigned] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [projectNames, setProjectNames] = useState([])
+
+  // Load shared project names on mount
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(r => r.json())
+      .then(data => Array.isArray(data) && setProjectNames(data.map(p => p.name)))
+      .catch(() => {})
+  }, [])
 
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
@@ -105,6 +114,19 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
     }
 
     const signatureData = sigCanvas.current.toDataURL('image/png')
+
+    // Save any new project names to the shared list
+    for (const p of validProjects) {
+      if (p.name && !projectNames.includes(p.name)) {
+        fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: p.name }),
+        }).then(r => r.json()).then(saved => {
+          if (saved?.name) setProjectNames(prev => [...new Set([...prev, saved.name])].sort())
+        }).catch(() => {})
+      }
+    }
 
     // Aggregate all photos from all projects for top-level storage
     const allPhotos = validProjects.flatMap(p => p.photos || [])
@@ -216,12 +238,16 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
 
             <input
               type="text"
+              list={`project-names-${idx}`}
               placeholder="Project name *"
               value={project.name}
               onChange={(e) => updateProject(idx, 'name', e.target.value)}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               required
             />
+            <datalist id={`project-names-${idx}`}>
+              {projectNames.map(name => <option key={name} value={name} />)}
+            </datalist>
 
             <input
               type="text"
