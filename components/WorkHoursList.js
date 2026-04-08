@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Pencil, MapPin, Clock, FileText, Trash2 } from 'lucide-react'
+import { Pencil, MapPin, Clock, FileText, Trash2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -12,6 +12,7 @@ export default function WorkHoursList({ workHours = [], role }) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState(null)
   const [deleteError, setDeleteError] = useState('')
+  const [lightbox, setLightbox] = useState(null)
   const parseProjects = (projects) => {
     try {
       if (!projects) return []
@@ -48,6 +49,26 @@ export default function WorkHoursList({ workHours = [], role }) {
 
   return (
     <div className="space-y-4">
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <img
+            src={lightbox}
+            alt="Job site photo"
+            className="max-w-full max-h-full rounded-lg shadow-2xl object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 text-white bg-black/40 rounded-full p-1"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
       {deleteError && (
         <p className="text-sm text-red-600">{deleteError}</p>
       )}
@@ -133,6 +154,21 @@ export default function WorkHoursList({ workHours = [], role }) {
                         <span className="flex items-center gap-1"><FileText className="h-3 w-3" />{project.description}</span>
                       )}
                     </div>
+                    {/* Per-project photos */}
+                    {Array.isArray(project?.photos) && project.photos.length > 0 && (
+                      <div className="grid grid-cols-4 gap-1 mt-2">
+                        {project.photos.map((url, pIdx) => (
+                          <button
+                            key={pIdx}
+                            type="button"
+                            onClick={() => setLightbox(url)}
+                            className="relative rounded overflow-hidden aspect-square hover:opacity-90 transition-opacity"
+                          >
+                            <img src={url} alt={`Photo ${pIdx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
