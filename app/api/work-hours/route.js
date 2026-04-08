@@ -13,7 +13,7 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { employeeId, date, signature, photos, latitude, longitude, locationName } = body
+    const { employeeId, date, signature, photos } = body
     const projects = sanitizeObject(body.projects)
 
     // Validate required fields
@@ -40,9 +40,6 @@ export async function POST(request) {
     const photosJson = Array.isArray(photos) && photos.length > 0
       ? JSON.stringify(photos)
       : null
-    const lat = typeof latitude === 'number' ? latitude : null
-    const lng = typeof longitude === 'number' ? longitude : null
-    const locName = typeof locationName === 'string' ? locationName.slice(0, 500) : null
 
     // Check if an entry already exists for this date
     const existing = await prisma.workHour.findFirst({
@@ -73,10 +70,6 @@ export async function POST(request) {
           hoursWorked: newTotalHours,
           description: updatedProjects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),
           photos: updatedPhotos.length > 0 ? JSON.stringify(updatedPhotos) : existing.photos,
-          // Only update location if not already set
-          latitude: existing.latitude ?? lat,
-          longitude: existing.longitude ?? lng,
-          locationName: existing.locationName ?? locName,
         }
       })
 
@@ -92,9 +85,6 @@ export async function POST(request) {
           description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; '),
           signature: signature || null,
           photos: photosJson,
-          latitude: lat,
-          longitude: lng,
-          locationName: locName,
         }
       })
 

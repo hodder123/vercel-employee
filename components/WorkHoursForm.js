@@ -3,86 +3,34 @@
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
-import { MapPin, Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react'
+import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react'
 
-const QUICK_HOURS = [4, 6, 8, 10]
+const QUICK_HOURS = [1, 2, 4, 8]
 
 export default function WorkHoursForm({ employeeId, employeeName }) {
   const router = useRouter()
   const sigCanvas = useRef(null)
-  const fileInputRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasSigned, setHasSigned] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  // Location state
-  const [location, setLocation] = useState({
-    lat: null,
-    lng: null,
-    name: null,
-    loading: false,
-    error: null,
-  })
-
-  // Photo upload state
-  const [photos, setPhotos] = useState([])
-  const [photoLoading, setPhotoLoading] = useState(false)
-  const [photoError, setPhotoError] = useState('')
-
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
-    projects: [{ name: '', location: '', hours: '', description: '' }],
+    projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
   })
 
-  // ── Location capture ──────────────────────────────────────────────────────
-  const captureLocation = useCallback(async () => {
-    if (!navigator.geolocation) {
-      setLocation(prev => ({ ...prev, error: 'Geolocation is not supported by your browser.' }))
-      return
-    }
-    setLocation({ lat: null, lng: null, name: null, loading: true, error: null })
-    try {
-      const pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 0,
-        })
-      )
-      const { latitude, longitude } = pos.coords
-      let name = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        if (res.ok) {
-          const data = await res.json()
-          name = data.display_name || name
-        }
-      } catch {
-        // silently fall back to coords
-      }
-      setLocation({ lat: latitude, lng: longitude, name, loading: false, error: null })
-    } catch (err) {
-      const msg =
-        err.code === 1
-          ? 'Location permission denied. Please allow location access and try again.'
-          : 'Could not get your location. Please try again.'
-      setLocation({ lat: null, lng: null, name: null, loading: false, error: msg })
-    }
-  }, [])
+  // Track uploading state per project
+  const [photoLoading, setPhotoLoading] = useState({})
+  const [photoError, setPhotoError] = useState({})
+  const fileInputRefs = useRef({})
 
-  const clearLocation = () =>
-    setLocation({ lat: null, lng: null, name: null, loading: false, error: null })
-
-  // ── Photo upload ──────────────────────────────────────────────────────────
-  const handlePhotoChange = async (e) => {
+  // ── Photo upload per project ──────────────────────────────────────────────
+  const handlePhotoChange = async (e, idx) => {
     const files = Array.from(e.target.files)
     if (!files.length) return
-    setPhotoLoading(true)
-    setPhotoError('')
+    setPhotoLoading(prev => ({ ...prev, [idx]: true }))
+    setPhotoError(prev => ({ ...prev, [idx]: '' }))
     const newUrls = []
     for (const file of files) {
       const fd = new FormData()
@@ -93,21 +41,24 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
         if (!res.ok) throw new Error(data.error || 'Upload failed')
         newUrls.push(data.url)
       } catch (err) {
-        setPhotoError(err.message)
+        setPhotoError(prev => ({ ...prev, [idx]: err.message }))
       }
     }
-    setPhotos(prev => [...prev, ...newUrls])
-    setPhotoLoading(false)
+    updateProject(idx, 'photos', [...(formData.projects[idx].photos || []), ...newUrls])
+    setPhotoLoading(prev => ({ ...prev, [idx]: false }))
     e.target.value = ''
   }
 
-  const removePhoto = (idx) => setPhotos(prev => prev.filter((_, i) => i !== idx))
+  const removePhoto = (projectIdx, photoIdx) => {
+    const updated = formData.projects[projectIdx].photos.filter((_, i) => i !== photoIdx)
+    updateProject(projectIdx, 'photos', updated)
+  }
 
   // ── Project helpers ───────────────────────────────────────────────────────
   const addProject = () =>
     setFormData(f => ({
       ...f,
-      projects: [...f.projects, { name: '', location: '', hours: '', description: '' }],
+      projects: [...f.projects, { name: '', location: '', hours: '', description: '', photos: [] }],
     }))
 
   const removeProject = (idx) =>
@@ -155,6 +106,9 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
 
     const signatureData = sigCanvas.current.toDataURL('image/png')
 
+    // Aggregate all photos from all projects for top-level storage
+    const allPhotos = validProjects.flatMap(p => p.photos || [])
+
     try {
       const res = await fetch('/api/work-hours', {
         method: 'POST',
@@ -164,10 +118,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
           date: formData.date,
           projects: validProjects,
           signature: signatureData,
-          photos: photos.length ? photos : undefined,
-          latitude: location.lat || undefined,
-          longitude: location.lng || undefined,
-          locationName: location.name || undefined,
+          photos: allPhotos.length ? allPhotos : undefined,
         }),
       })
 
@@ -179,11 +130,11 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       // Reset
       setFormData({
         date: getPSTDate(),
-        projects: [{ name: '', location: '', hours: '', description: '' }],
+        projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
       })
       clearSignature()
-      setPhotos([])
-      clearLocation()
+      setPhotoLoading({})
+      setPhotoError({})
       setSubmitted(true)
       setTimeout(() => setSubmitted(false), 3500)
       router.refresh()
@@ -193,6 +144,8 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       setLoading(false)
     }
   }
+
+  const anyPhotoUploading = Object.values(photoLoading).some(Boolean)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -316,100 +269,55 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
               rows={2}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
             />
+
+            {/* ── Per-project photos ── */}
+            <div>
+              {project.photos?.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {project.photos.map((url, photoIdx) => (
+                    <div key={photoIdx} className="relative group rounded-lg overflow-hidden aspect-square">
+                      <img src={url} alt={`Photo ${photoIdx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(idx, photoIdx)}
+                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <input
+                type="file"
+                ref={el => fileInputRefs.current[idx] = el}
+                accept="image/*"
+                capture="environment"
+                multiple
+                className="hidden"
+                onChange={(e) => handlePhotoChange(e, idx)}
+              />
+
+              <button
+                type="button"
+                onClick={() => fileInputRefs.current[idx]?.click()}
+                disabled={photoLoading[idx]}
+                className="flex items-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50"
+              >
+                {photoLoading[idx] ? (
+                  <><Loader2 className="h-4 w-4 animate-spin text-blue-500" /> Uploading…</>
+                ) : (
+                  <><Camera className="h-4 w-4 text-gray-500" /> {project.photos?.length ? 'Add More Photos' : 'Add Photos'}</>
+                )}
+              </button>
+
+              {photoError[idx] && (
+                <p className="text-xs text-red-500 mt-1">{photoError[idx]}</p>
+              )}
+            </div>
           </div>
         ))}
-      </div>
-
-      {/* ── Location ── */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          GPS Location
-        </label>
-
-        {location.loading ? (
-          <div className="flex items-center gap-2 text-sm text-blue-600 py-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Getting your location…
-          </div>
-        ) : location.lat ? (
-          <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
-            <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-green-700">Location captured</p>
-              <p className="text-xs text-green-600 truncate">{location.name}</p>
-            </div>
-            <button type="button" onClick={clearLocation} className="text-green-500 hover:text-green-700 flex-shrink-0">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={captureLocation}
-            className="flex items-center gap-2 w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
-          >
-            <MapPin className="h-4 w-4 text-gray-500" />
-            Capture My Location
-          </button>
-        )}
-
-        {location.error && (
-          <p className="text-xs text-red-500 mt-1">{location.error}</p>
-        )}
-        <p className="text-xs text-gray-400 mt-1">Optional — records where you are when you submit</p>
-      </div>
-
-      {/* ── Photos ── */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          Job Site Photos
-        </label>
-
-        {/* Photo thumbnails */}
-        {photos.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            {photos.map((url, idx) => (
-              <div key={idx} className="relative group rounded-lg overflow-hidden aspect-square">
-                <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => removePhoto(idx)}
-                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/*"
-          capture="environment"
-          multiple
-          className="hidden"
-          onChange={handlePhotoChange}
-        />
-
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={photoLoading}
-          className="flex items-center gap-2 w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50"
-        >
-          {photoLoading ? (
-            <><Loader2 className="h-4 w-4 animate-spin text-blue-500" /> Uploading…</>
-          ) : (
-            <><Camera className="h-4 w-4 text-gray-500" /> {photos.length ? 'Add More Photos' : 'Take / Choose Photos'}</>
-          )}
-        </button>
-
-        {photoError && (
-          <p className="text-xs text-red-500 mt-1">{photoError}</p>
-        )}
-        <p className="text-xs text-gray-400 mt-1">Optional — attach job site photos (max 8 MB each)</p>
       </div>
 
       {/* ── Signature ── */}
@@ -439,14 +347,14 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       {/* ── Submit ── */}
       <button
         type="submit"
-        disabled={loading || !hasSigned || photoLoading}
+        disabled={loading || !hasSigned || anyPhotoUploading}
         className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
       >
         {loading
           ? 'Saving…'
           : !hasSigned
           ? 'Please sign first'
-          : photoLoading
+          : anyPhotoUploading
           ? 'Wait for photos to upload…'
           : 'Submit Hours'}
       </button>
