@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
-import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react'
+import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown } from 'lucide-react'
 
 const QUICK_HOURS = [1, 2, 4, 8]
 
@@ -24,6 +24,20 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       .catch(() => {})
   }, [])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (openDropdown !== null) {
+        const ref = dropdownRefs.current[openDropdown]
+        if (ref && !ref.contains(e.target)) {
+          setOpenDropdown(null)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openDropdown])
+
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
     projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
@@ -33,6 +47,10 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   const [photoLoading, setPhotoLoading] = useState({})
   const [photoError, setPhotoError] = useState({})
   const fileInputRefs = useRef({})
+
+  // Dropdown open state per project index
+  const [openDropdown, setOpenDropdown] = useState(null)
+  const dropdownRefs = useRef({})
 
   // ── Photo upload per project ──────────────────────────────────────────────
   const handlePhotoChange = async (e, idx) => {
@@ -236,18 +254,50 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
               )}
             </div>
 
-            <input
-              type="text"
-              list={`project-names-${idx}`}
-              placeholder="Project name *"
-              value={project.name}
-              onChange={(e) => updateProject(idx, 'name', e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              required
-            />
-            <datalist id={`project-names-${idx}`}>
-              {projectNames.map(name => <option key={name} value={name} />)}
-            </datalist>
+            {/* Project name with click-to-open dropdown */}
+            <div className="relative" ref={el => dropdownRefs.current[idx] = el}>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Project name *"
+                  value={project.name}
+                  onChange={(e) => { updateProject(idx, 'name', e.target.value); setOpenDropdown(idx) }}
+                  onFocus={() => setOpenDropdown(idx)}
+                  className="w-full px-3 py-2.5 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  required
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setOpenDropdown(openDropdown === idx ? null : idx)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform ${openDropdown === idx ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+              {openDropdown === idx && projectNames.length > 0 && (
+                <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {projectNames
+                    .filter(name => name.toLowerCase().includes(project.name.toLowerCase()))
+                    .map(name => (
+                      <li key={name}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); updateProject(idx, 'name', name); setOpenDropdown(null) }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${project.name === name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                        >
+                          {name}
+                        </button>
+                      </li>
+                    ))
+                  }
+                  {projectNames.filter(name => name.toLowerCase().includes(project.name.toLowerCase())).length === 0 && (
+                    <li className="px-3 py-2 text-sm text-gray-400 italic">No matches — type to add new</li>
+                  )}
+                </ul>
+              )}
+            </div>
 
             <input
               type="text"
