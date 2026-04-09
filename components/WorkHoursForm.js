@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
-import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, Check } from 'lucide-react'
 
 const QUICK_HOURS = [1, 2, 4, 8]
 
@@ -51,6 +51,8 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   // Dropdown open state per project index
   const [openDropdown, setOpenDropdown] = useState(null)
   const dropdownRefs = useRef({})
+  // "Add new" input state per project index
+  const [addingNew, setAddingNew] = useState({})
 
   // ── Photo upload per project ──────────────────────────────────────────────
   const handlePhotoChange = async (e, idx) => {
@@ -254,48 +256,99 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
               )}
             </div>
 
-            {/* Project name with click-to-open dropdown */}
+            {/* Project name — checkbox picker */}
             <div className="relative" ref={el => dropdownRefs.current[idx] = el}>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Project name *"
-                  value={project.name}
-                  onChange={(e) => { updateProject(idx, 'name', e.target.value); setOpenDropdown(idx) }}
-                  onFocus={() => setOpenDropdown(idx)}
-                  className="w-full px-3 py-2.5 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  required
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => setOpenDropdown(openDropdown === idx ? null : idx)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${openDropdown === idx ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-              {openDropdown === idx && projectNames.length > 0 && (
-                <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {projectNames
-                    .filter(name => name.toLowerCase().includes(project.name.toLowerCase()))
-                    .map(name => (
-                      <li key={name}>
+              {/* Trigger button */}
+              <button
+                type="button"
+                onClick={() => { setOpenDropdown(openDropdown === idx ? null : idx); setAddingNew(a => ({ ...a, [idx]: false })) }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 border rounded-lg text-sm transition-colors ${
+                  project.name
+                    ? 'border-blue-400 bg-blue-50 text-blue-800 font-medium'
+                    : 'border-gray-300 bg-white text-gray-400'
+                }`}
+              >
+                <span>{project.name || 'Select project *'}</span>
+                <ChevronDown className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${openDropdown === idx ? 'rotate-180' : ''}`} />
+              </button>
+              {/* Hidden required input so form validation still works */}
+              <input type="text" value={project.name} onChange={() => {}} required className="sr-only" tabIndex={-1} aria-hidden />
+
+              {openDropdown === idx && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                  {/* Existing projects as checkboxes */}
+                  {projectNames.length > 0 && (
+                    <ul className="max-h-52 overflow-y-auto divide-y divide-gray-50">
+                      {projectNames.map(name => {
+                        const selected = project.name === name
+                        return (
+                          <li key={name}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                updateProject(idx, 'name', selected ? '' : name)
+                                if (!selected) setOpenDropdown(null)
+                              }}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors text-left ${
+                                selected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                selected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                              }`}>
+                                {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                              </span>
+                              {name}
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+
+                  {/* Add new */}
+                  <div className="border-t border-gray-100">
+                    {!addingNew[idx] ? (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); setAddingNew(a => ({ ...a, [idx]: true })) }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 hover:bg-blue-50 font-medium"
+                      >
+                        <Plus className="h-4 w-4" /> Add new project
+                      </button>
+                    ) : (
+                      <div className="flex gap-2 p-2">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="New project name"
+                          className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              const val = e.target.value.trim()
+                              if (val) { updateProject(idx, 'name', val); setOpenDropdown(null); setAddingNew(a => ({ ...a, [idx]: false })) }
+                            }
+                            if (e.key === 'Escape') setAddingNew(a => ({ ...a, [idx]: false }))
+                          }}
+                        />
                         <button
                           type="button"
-                          onMouseDown={(e) => { e.preventDefault(); updateProject(idx, 'name', name); setOpenDropdown(null) }}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${project.name === name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            const input = e.currentTarget.previousSibling
+                            const val = input.value.trim()
+                            if (val) { updateProject(idx, 'name', val); setOpenDropdown(null); setAddingNew(a => ({ ...a, [idx]: false })) }
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium"
                         >
-                          {name}
+                          Add
                         </button>
-                      </li>
-                    ))
-                  }
-                  {projectNames.filter(name => name.toLowerCase().includes(project.name.toLowerCase())).length === 0 && (
-                    <li className="px-3 py-2 text-sm text-gray-400 italic">No matches — type to add new</li>
-                  )}
-                </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
