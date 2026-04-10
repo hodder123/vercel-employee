@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
-import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, Check } from 'lucide-react'
+import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown } from 'lucide-react'
 
 const QUICK_HOURS = [1, 2, 4, 8]
 
@@ -304,24 +304,24 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
                               const selected = project.name === name
                               return (
                                 <li key={name}>
-                                  <button
-                                    type="button"
+                                  <label
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer transition-colors ${
+                                      selected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
                                     onMouseDown={e => {
                                       e.preventDefault()
                                       updateProject(idx, 'name', selected ? '' : name)
                                       if (!selected) { setOpenDropdown(null); setAddingNew(a => ({ ...a, [idx]: '' })) }
                                     }}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors ${
-                                      selected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                                    }`}
                                   >
-                                    <span className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                      selected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-                                    }`}>
-                                      {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      readOnly
+                                      checked={selected}
+                                      className="w-4 h-4 rounded accent-blue-600 flex-shrink-0"
+                                    />
                                     {name}
-                                  </button>
+                                  </label>
                                 </li>
                               )
                             })}
