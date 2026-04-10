@@ -56,10 +56,10 @@ export const authOptions = {
     }),
   ],
 
-session: {
+  session: {
     strategy: 'jwt',
-    maxAge: 5 * 60, // 5 minutes
-    updateAge: 60, // Update session every 60 seconds of activity
+    maxAge: 8 * 60 * 60, // 8 hours (full work day)
+    updateAge: 60 * 60,  // Refresh token once per hour
   },
 
   callbacks: {
