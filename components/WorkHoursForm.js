@@ -111,6 +111,21 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   const [submitted, setSubmitted] = useState(false)
   const [projectNames, setProjectNames] = useState([])
 
+  // Dropdown state — declared before the useEffect that depends on it
+  const [openDropdown, setOpenDropdown] = useState(null)
+  const dropdownRefs = useRef({})
+  const [addingNew, setAddingNew] = useState({})
+
+  const [formData, setFormData] = useState({
+    date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
+    projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
+  })
+
+  // Track uploading state per project
+  const [photoLoading, setPhotoLoading] = useState({})
+  const [photoError, setPhotoError] = useState({})
+  const fileInputRefs = useRef({})
+
   // Load shared project names on mount
   useEffect(() => {
     fetch('/api/projects')
@@ -132,22 +147,6 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [openDropdown])
-
-  const [formData, setFormData] = useState({
-    date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
-    projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
-  })
-
-  // Track uploading state per project
-  const [photoLoading, setPhotoLoading] = useState({})
-  const [photoError, setPhotoError] = useState({})
-  const fileInputRefs = useRef({})
-
-  // Dropdown open state per project index
-  const [openDropdown, setOpenDropdown] = useState(null)
-  const dropdownRefs = useRef({})
-  // "Add new" input state per project index
-  const [addingNew, setAddingNew] = useState({})
 
   // ── Photo upload per project ──────────────────────────────────────────────
   const handlePhotoChange = async (e, idx) => {
