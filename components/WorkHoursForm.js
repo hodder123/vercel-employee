@@ -7,6 +7,101 @@ import { Camera, X, Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown
 
 const QUICK_HOURS = [1, 2, 4, 8]
 
+function ProjectPicker({ idx, project, projectNames, openDropdown, setOpenDropdown, addingNew, setAddingNew, updateProject, dropdownRefs }) {
+  const isOpen = openDropdown === idx
+  const q = (addingNew[idx] || '').toLowerCase()
+  const filtered = projectNames.filter(n => n.toLowerCase().includes(q))
+  const exactMatch = projectNames.some(n => n.toLowerCase() === q)
+
+  return (
+    <div className="relative" ref={el => { dropdownRefs.current[idx] = el }}>
+      <button
+        type="button"
+        onClick={() => setOpenDropdown(isOpen ? null : idx)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 border rounded-lg text-sm transition-colors ${
+          project.name ? 'border-blue-400 bg-blue-50 text-blue-800 font-medium' : 'border-gray-300 bg-white text-gray-400'
+        }`}
+      >
+        <span>{project.name || 'Select project *'}</span>
+        <ChevronDown className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <input type="text" value={project.name} onChange={() => {}} required className="sr-only" tabIndex={-1} />
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              type="text"
+              placeholder="Search or type new…"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={addingNew[idx] || ''}
+              onChange={e => setAddingNew(a => ({ ...a, [idx]: e.target.value }))}
+            />
+          </div>
+
+          {filtered.length > 0 && (
+            <ul className="max-h-44 overflow-y-auto divide-y divide-gray-50">
+              {filtered.map(name => {
+                const selected = project.name === name
+                return (
+                  <li key={name}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateProject(idx, 'name', selected ? '' : name)
+                        if (!selected) {
+                          setOpenDropdown(null)
+                          setAddingNew(a => ({ ...a, [idx]: '' }))
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors ${
+                        selected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={selected}
+                        tabIndex={-1}
+                        className="w-4 h-4 accent-blue-600 flex-shrink-0 pointer-events-none"
+                      />
+                      {name}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          {addingNew[idx] && !exactMatch && (
+            <div className="border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const val = (addingNew[idx] || '').trim()
+                  if (val) {
+                    updateProject(idx, 'name', val)
+                    setOpenDropdown(null)
+                    setAddingNew(a => ({ ...a, [idx]: '' }))
+                  }
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 hover:bg-blue-50 font-medium"
+              >
+                <Plus className="h-4 w-4" />
+                Add &quot;{addingNew[idx]}&quot;
+              </button>
+            </div>
+          )}
+
+          {filtered.length === 0 && !addingNew[idx] && (
+            <p className="px-3 py-3 text-sm text-gray-400 italic">Type to search or add new</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function WorkHoursForm({ employeeId, employeeName }) {
   const router = useRouter()
   const sigCanvas = useRef(null)
@@ -257,109 +352,17 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
             </div>
 
             {/* Project name — searchable checkbox picker */}
-            <div className="relative" ref={el => dropdownRefs.current[idx] = el}>
-              {/* Trigger button */}
-              <button
-                type="button"
-                onClick={() => setOpenDropdown(openDropdown === idx ? null : idx)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 border rounded-lg text-sm transition-colors ${
-                  project.name
-                    ? 'border-blue-400 bg-blue-50 text-blue-800 font-medium'
-                    : 'border-gray-300 bg-white text-gray-400'
-                }`}
-              >
-                <span>{project.name || 'Select project *'}</span>
-                <ChevronDown className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${openDropdown === idx ? 'rotate-180' : ''}`} />
-              </button>
-              {/* Hidden input for required validation */}
-              <input type="text" value={project.name} onChange={() => {}} required className="sr-only" tabIndex={-1} aria-hidden />
-
-              {openDropdown === idx && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
-                  {/* Search input */}
-                  <div className="p-2 border-b border-gray-100">
-                    <input
-                      autoFocus
-                      type="text"
-                      placeholder="Search or type new project…"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={addingNew[idx] || ''}
-                      onChange={e => setAddingNew(a => ({ ...a, [idx]: e.target.value }))}
-                      onKeyDown={e => {
-                        if (e.key === 'Escape') setOpenDropdown(null)
-                      }}
-                    />
-                  </div>
-
-                  {/* Filtered checkbox list */}
-                  {(() => {
-                    const q = (addingNew[idx] || '').toLowerCase()
-                    const filtered = projectNames.filter(n => n.toLowerCase().includes(q))
-                    const exactMatch = projectNames.some(n => n.toLowerCase() === q)
-                    return (
-                      <>
-                        {filtered.length > 0 && (
-                          <ul className="max-h-44 overflow-y-auto divide-y divide-gray-50">
-                            {filtered.map(name => {
-                              const selected = project.name === name
-                              return (
-                                <li key={name}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      updateProject(idx, 'name', selected ? '' : name)
-                                      if (!selected) { setOpenDropdown(null); setAddingNew(a => ({ ...a, [idx]: '' })) }
-                                    }}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left cursor-pointer transition-colors ${
-                                      selected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      readOnly
-                                      checked={selected}
-                                      tabIndex={-1}
-                                      className="w-4 h-4 accent-blue-600 flex-shrink-0 pointer-events-none"
-                                    />
-                                    {name}
-                                  </button>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        )}
-
-                        {/* Add new if typed something that isn't an exact match */}
-                        {addingNew[idx] && !exactMatch && (
-                          <div className="border-t border-gray-100">
-                            <button
-                              type="button"
-                              onMouseDown={e => {
-                                e.preventDefault()
-                                const val = (addingNew[idx] || '').trim()
-                                if (val) {
-                                  updateProject(idx, 'name', val)
-                                  setOpenDropdown(null)
-                                  setAddingNew(a => ({ ...a, [idx]: '' }))
-                                }
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 hover:bg-blue-50 font-medium"
-                            >
-                              <Plus className="h-4 w-4" />
-                              Add &quot;{addingNew[idx]}&quot;
-                            </button>
-                          </div>
-                        )}
-
-                        {filtered.length === 0 && !addingNew[idx] && (
-                          <p className="px-3 py-3 text-sm text-gray-400 italic">Type to search or add new</p>
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
-              )}
-            </div>
+            <ProjectPicker
+              idx={idx}
+              project={project}
+              projectNames={projectNames}
+              openDropdown={openDropdown}
+              setOpenDropdown={setOpenDropdown}
+              addingNew={addingNew}
+              setAddingNew={setAddingNew}
+              updateProject={updateProject}
+              dropdownRefs={dropdownRefs}
+            />
 
             <input
               type="text"
