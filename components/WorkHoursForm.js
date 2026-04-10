@@ -304,24 +304,25 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
                               const selected = project.name === name
                               return (
                                 <li key={name}>
-                                  <label
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer transition-colors ${
-                                      selected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                    }`}
-                                    onMouseDown={e => {
-                                      e.preventDefault()
+                                  <button
+                                    type="button"
+                                    onClick={() => {
                                       updateProject(idx, 'name', selected ? '' : name)
                                       if (!selected) { setOpenDropdown(null); setAddingNew(a => ({ ...a, [idx]: '' })) }
                                     }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left cursor-pointer transition-colors ${
+                                      selected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
                                   >
                                     <input
                                       type="checkbox"
                                       readOnly
                                       checked={selected}
-                                      className="w-4 h-4 rounded accent-blue-600 flex-shrink-0"
+                                      tabIndex={-1}
+                                      className="w-4 h-4 accent-blue-600 flex-shrink-0 pointer-events-none"
                                     />
                                     {name}
-                                  </label>
+                                  </button>
                                 </li>
                               )
                             })}
