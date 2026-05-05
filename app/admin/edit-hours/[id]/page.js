@@ -5,7 +5,20 @@ import { prisma } from '@/lib/prisma'
 import EditHoursForm from '@/components/EditHoursForm'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Clock } from 'lucide-react'
+
+const SUBMITTED_FMT = {
+  year: 'numeric', month: 'short', day: 'numeric',
+  hour: 'numeric', minute: '2-digit',
+  timeZone: 'America/Los_Angeles', timeZoneName: 'short'
+}
+
+function formatSubmitted(value) {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('en-US', SUBMITTED_FMT)
+}
 
 export default async function EditHoursPage({ params }) {
   const session = await getServerSession(authOptions)
@@ -46,6 +59,23 @@ export default async function EditHoursPage({ params }) {
           <CardDescription>
             {workHour.employee?.fullName || workHour.employee?.name} &middot; {new Date(workHour.date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}
           </CardDescription>
+          {/* Admin-only submission timestamp (page is gated to admins above) */}
+          {workHour.createdAt && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span className="font-medium text-foreground">Submitted:</span>
+                {formatSubmitted(workHour.createdAt)}
+              </span>
+              {workHour.updatedAt &&
+                new Date(workHour.updatedAt).getTime() - new Date(workHour.createdAt).getTime() > 60_000 && (
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium text-foreground">Last edited:</span>
+                    {formatSubmitted(workHour.updatedAt)}
+                  </span>
+                )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <EditHoursForm workHour={{ ...workHour, projects: parseProjects(workHour.projects) }} />

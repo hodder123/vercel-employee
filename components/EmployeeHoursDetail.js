@@ -6,7 +6,20 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Pencil, MapPin, ChevronLeft, ChevronRight, Image as ImageIcon, ExternalLink } from 'lucide-react'
+import { Pencil, MapPin, ChevronLeft, ChevronRight, Image as ImageIcon, ExternalLink, Clock } from 'lucide-react'
+
+const SUBMITTED_FMT = {
+  year: 'numeric', month: 'short', day: 'numeric',
+  hour: 'numeric', minute: '2-digit',
+  timeZone: 'America/Los_Angeles', timeZoneName: 'short'
+}
+
+function formatSubmitted(value) {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('en-US', SUBMITTED_FMT)
+}
 
 const PAGE_SIZE = 10
 
@@ -115,6 +128,25 @@ export default function EmployeeHoursDetail({ employee, workHours }) {
                             </Badge>
                           )}
                         </div>
+                        {/* Admin-only submission timestamp */}
+                        {entry.createdAt && (
+                          <p
+                            className="flex items-center gap-1 text-xs text-muted-foreground mt-1.5"
+                            title={`Submitted ${formatSubmitted(entry.createdAt)}${
+                              entry.updatedAt && new Date(entry.updatedAt).getTime() !== new Date(entry.createdAt).getTime()
+                                ? ` · Last edited ${formatSubmitted(entry.updatedAt)}`
+                                : ''
+                            }`}
+                          >
+                            <Clock className="h-3 w-3" />
+                            Submitted {formatSubmitted(entry.createdAt)}
+                            {entry.updatedAt && new Date(entry.updatedAt).getTime() - new Date(entry.createdAt).getTime() > 60_000 && (
+                              <span className="ml-1 text-muted-foreground/80">
+                                · edited {formatSubmitted(entry.updatedAt)}
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                       <Button size="sm" variant="outline" asChild>
                         <Link href={`/admin/edit-hours/${entry.id}`}>
