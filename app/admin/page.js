@@ -183,9 +183,15 @@ export default async function AdminDashboardPage() {
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {notLoggedToday.map(emp => (
-                <Badge key={emp.id} variant="warning">
-                  {emp.fullName || emp.name}
-                </Badge>
+                <Link
+                  key={emp.id}
+                  href={`/admin/employee/${emp.id}`}
+                  className="rounded-md transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-1"
+                >
+                  <Badge variant="warning" className="cursor-pointer">
+                    {emp.fullName || emp.name}
+                  </Badge>
+                </Link>
               ))}
             </div>
           </CardContent>

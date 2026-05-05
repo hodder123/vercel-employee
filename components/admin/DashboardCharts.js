@@ -1,9 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Users } from 'lucide-react'
+import { TrendingUp, Users, ChevronRight } from 'lucide-react'
 
 export default function DashboardCharts({ dailyTrend, weeklyEmployees }) {
   const visibleEmployees = weeklyEmployees.slice(0, 8)
@@ -54,18 +55,25 @@ export default function DashboardCharts({ dailyTrend, weeklyEmployees }) {
         </CardHeader>
         <CardContent>
           {weeklyEmployees.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-1">
               {visibleEmployees.map((employee) => (
-                <div key={employee.id} className="flex items-center justify-between gap-3">
+                <Link
+                  key={employee.id}
+                  href={`/admin/employee/${employee.id}`}
+                  className="group flex items-center justify-between gap-3 -mx-2 px-2 py-2 rounded-md hover:bg-muted/50 transition-colors"
+                >
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{employee.fullName || employee.name}</p>
+                    <p className="font-medium truncate group-hover:text-blue-700">{employee.fullName || employee.name}</p>
                     <p className="text-xs text-muted-foreground">{employee.entries} entries</p>
                   </div>
-                  <Badge variant="info">{employee.hours.toFixed(1)}h</Badge>
-                </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Badge variant="info">{employee.hours.toFixed(1)}h</Badge>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </div>
+                </Link>
               ))}
               {remaining > 0 && (
-                <p className="text-xs text-muted-foreground">+ {remaining} more employees</p>
+                <p className="text-xs text-muted-foreground pt-2">+ {remaining} more employees</p>
               )}
             </div>
           ) : (
