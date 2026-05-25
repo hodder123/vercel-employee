@@ -433,7 +433,6 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
                 type="file"
                 ref={el => fileInputRefs.current[idx] = el}
                 accept="image/*"
-                capture="environment"
                 multiple
                 className="hidden"
                 onChange={(e) => handlePhotoChange(e, idx)}

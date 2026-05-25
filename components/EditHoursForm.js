@@ -271,7 +271,6 @@ export default function EditHoursForm({ workHour }) {
                   type="file"
                   ref={el => { fileInputRefs.current[index] = el }}
                   accept="image/*"
-                  capture="environment"
                   multiple
                   className="hidden"
                   onChange={(e) => handlePhotoChange(e, index)}
