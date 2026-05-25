@@ -1,7 +1,38 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { Camera, X, Loader2 } from 'lucide-react'
+
+function parsePhotos(val) {
+  try {
+    if (Array.isArray(val)) return val
+    if (typeof val === 'string') {
+      const parsed = JSON.parse(val)
+      return Array.isArray(parsed) ? parsed : []
+    }
+    return []
+  } catch {
+    return []
+  }
+}
+
+// Build the initial project list with a `photos` array on each project.
+// Legacy entries may store photos only at the top level — if no project
+// carries photos, seed the first project so they remain visible/editable.
+function buildInitialProjects(workHour) {
+  const projects = (workHour.projects.length > 0
+    ? workHour.projects
+    : [{ name: '', location: '', hours: '', description: '' }]
+  ).map(p => ({ ...p, photos: Array.isArray(p.photos) ? p.photos : [] }))
+
+  const hasPerProjectPhotos = projects.some(p => p.photos.length > 0)
+  const topLevelPhotos = parsePhotos(workHour.photos)
+  if (!hasPerProjectPhotos && topLevelPhotos.length > 0 && projects.length > 0) {
+    projects[0] = { ...projects[0], photos: topLevelPhotos }
+  }
+  return projects
+}
 
 export default function UserEditHoursForm({ workHour }) {
   const router = useRouter()
@@ -10,15 +41,46 @@ export default function UserEditHoursForm({ workHour }) {
 
   const [formData, setFormData] = useState({
     date: new Date(workHour.date).toISOString().split('T')[0],
-    projects: workHour.projects.length > 0 
-      ? workHour.projects 
-      : [{ name: '', location: '', hours: '', description: '' }]
+    projects: buildInitialProjects(workHour)
   })
+
+  // Photo upload state (per project index)
+  const [photoLoading, setPhotoLoading] = useState({})
+  const [photoError, setPhotoError] = useState({})
+  const fileInputRefs = useRef({})
 
   const updateProject = (index, field, value) => {
     const newProjects = [...formData.projects]
-    newProjects[index][field] = value
+    newProjects[index] = { ...newProjects[index], [field]: value }
     setFormData({ ...formData, projects: newProjects })
+  }
+
+  const handlePhotoChange = async (e, idx) => {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    setPhotoLoading(prev => ({ ...prev, [idx]: true }))
+    setPhotoError(prev => ({ ...prev, [idx]: '' }))
+    const newUrls = []
+    for (const file of files) {
+      const fd = new FormData()
+      fd.append('file', file)
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Upload failed')
+        newUrls.push(data.url)
+      } catch (err) {
+        setPhotoError(prev => ({ ...prev, [idx]: err.message }))
+      }
+    }
+    updateProject(idx, 'photos', [...(formData.projects[idx].photos || []), ...newUrls])
+    setPhotoLoading(prev => ({ ...prev, [idx]: false }))
+    e.target.value = ''
+  }
+
+  const removePhoto = (projectIdx, photoIdx) => {
+    const updated = (formData.projects[projectIdx].photos || []).filter((_, i) => i !== photoIdx)
+    updateProject(projectIdx, 'photos', updated)
   }
 
   const handleUpdate = async (e) => {
@@ -27,12 +89,15 @@ export default function UserEditHoursForm({ workHour }) {
     setError('')
 
     const validProjects = formData.projects.filter(p => p.name && p.hours)
-    
+
     if (validProjects.length === 0) {
       setError('Please add at least one project with name and hours')
       setLoading(false)
       return
     }
+
+    // Aggregate all photos across projects for the top-level photos column
+    const allPhotos = validProjects.flatMap(p => Array.isArray(p.photos) ? p.photos : [])
 
     try {
       const res = await fetch(`/api/work-hours/${workHour.id}`, {
@@ -40,7 +105,8 @@ export default function UserEditHoursForm({ workHour }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: formData.date,
-          projects: validProjects
+          projects: validProjects,
+          photos: allPhotos
         })
       })
 
@@ -56,6 +122,8 @@ export default function UserEditHoursForm({ workHour }) {
       setLoading(false)
     }
   }
+
+  const anyPhotoUploading = Object.values(photoLoading).some(Boolean)
 
   return (
     <form onSubmit={handleUpdate} className="space-y-6">
@@ -111,15 +179,63 @@ export default function UserEditHoursForm({ workHour }) {
             rows="2"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
+
+          {/* Photos */}
+          <div>
+            {project.photos?.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {project.photos.map((url, photoIdx) => (
+                  <div key={photoIdx} className="relative group rounded-lg overflow-hidden aspect-square">
+                    <img src={url} alt={`Photo ${photoIdx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index, photoIdx)}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input
+              type="file"
+              ref={el => { fileInputRefs.current[index] = el }}
+              accept="image/*"
+              capture="environment"
+              multiple
+              className="hidden"
+              onChange={(e) => handlePhotoChange(e, index)}
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRefs.current[index]?.click()}
+              disabled={photoLoading[index]}
+              className="flex items-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50"
+            >
+              {photoLoading[index] ? (
+                <><Loader2 className="h-4 w-4 animate-spin text-blue-500" /> Uploading…</>
+              ) : (
+                <><Camera className="h-4 w-4 text-gray-500" /> {project.photos?.length ? 'Add More Photos' : 'Add Photos'}</>
+              )}
+            </button>
+
+            {photoError[index] && (
+              <p className="text-xs text-red-500 mt-1">{photoError[index]}</p>
+            )}
+          </div>
         </div>
       ))}
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || anyPhotoUploading}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
       >
-        {loading ? 'Saving...' : 'Save Changes'}
+        {loading ? 'Saving...' : anyPhotoUploading ? 'Wait for photos to upload…' : 'Save Changes'}
       </button>
     </form>
   )

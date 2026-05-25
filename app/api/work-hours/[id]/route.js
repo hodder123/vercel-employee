@@ -15,7 +15,7 @@ export async function PUT(request, { params }) {
 
     const { id } = await params
     const body = await request.json()
-    const { date } = body
+    const { date, photos } = body
     const projects = sanitizeObject(body.projects)
 
     // Get the work hour entry
@@ -51,14 +51,22 @@ export async function PUT(request, { params }) {
 
     const totalHours = projects.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0)
 
+    const updateData = {
+      date: new Date(date + 'T12:00:00-08:00'),
+      projects: JSON.stringify(projects),
+      hoursWorked: totalHours,
+      description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; ')
+    }
+
+    // Only touch the top-level photos column when the client sends a photos
+    // array — keeps existing photos intact for older clients that omit it.
+    if (Array.isArray(photos)) {
+      updateData.photos = photos.length > 0 ? JSON.stringify(photos) : null
+    }
+
     const updated = await prisma.workHour.update({
       where: { id: parseInt(id) },
-      data: {
-        date: new Date(date + 'T12:00:00-08:00'),
-        projects: JSON.stringify(projects),
-        hoursWorked: totalHours,
-        description: projects.map(p => `${p.name}: ${p.description || 'N/A'}`).join('; ')
-      }
+      data: updateData
     })
 
     return NextResponse.json(updated)
