@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Camera, X, Loader2 } from 'lucide-react'
+import { prepareImageForUpload } from '@/lib/prepareImage'
 
 function parsePhotos(val) {
   try {
@@ -74,12 +75,24 @@ export default function EditHoursForm({ workHour }) {
     setPhotoLoading(prev => ({ ...prev, [idx]: true }))
     setPhotoError(prev => ({ ...prev, [idx]: '' }))
     const newUrls = []
-    for (const file of files) {
-      const fd = new FormData()
-      fd.append('file', file)
+    for (const rawFile of files) {
       try {
+        // HEIC/HEIF and oversized photos are converted to a small JPEG
+        // before upload — see lib/prepareImage.js for the reasoning.
+        const file = await prepareImageForUpload(rawFile)
+        const fd = new FormData()
+        fd.append('file', file)
         const res = await fetch('/api/upload', { method: 'POST', body: fd })
-        const data = await res.json()
+        let data
+        try {
+          data = await res.json()
+        } catch {
+          throw new Error(
+            res.status === 413
+              ? 'That photo is too large to upload. Please try a smaller one.'
+              : 'Upload failed — please try again.'
+          )
+        }
         if (!res.ok) throw new Error(data.error || 'Upload failed')
         newUrls.push(data.url)
       } catch (err) {
