@@ -8,6 +8,33 @@ import { prepareImageForUpload } from '@/lib/prepareImage'
 
 const QUICK_HOURS = [1, 2, 4, 8]
 
+// "Shop" is a restricted project name — only valid when actually working in the
+// shop, so we warn and require explicit confirmation before it can be logged.
+const isShopName = (name) => (name || '').trim().toLowerCase() === 'shop'
+
+// Employees sometimes log all their hours under one project and write the real
+// split into the notes ("3h framing, 5h at the other site"). Flag a description
+// that looks like it's hiding a second project so they separate them properly.
+const HOURS_IN_TEXT = /\b\d+(?:\.\d+)?\s*(?:h|hr|hrs|hour|hours)\b/i
+// Count sentence-like segments — two or more usually means two or more jobs
+// were written into one entry (e.g. "Ioniq, check operation. F150, oil change.").
+const countJobSegments = (desc) =>
+  (desc || '')
+    .split(/[.!?;\n]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2 && /[a-z]/i.test(part)).length
+const looksLikeLumpedProjects = (project, projectNames = []) => {
+  const desc = (project?.description || '').trim()
+  if (!desc) return false
+  if (HOURS_IN_TEXT.test(desc)) return true           // hours written into the notes
+  if (countJobSegments(desc) >= 2) return true         // multiple jobs as separate sentences
+  const lower = desc.toLowerCase()
+  const selected = (project?.name || '').trim().toLowerCase()
+  return projectNames.some(
+    (n) => n && n.length >= 3 && n.toLowerCase() !== selected && lower.includes(n.toLowerCase())
+  )
+}
+
 function ProjectPicker({ idx, project, projectNames, openDropdown, setOpenDropdown, addingNew, setAddingNew, updateProject, dropdownRefs }) {
   const isOpen = openDropdown === idx
   const q = (addingNew[idx] || '').toLowerCase()
@@ -119,7 +146,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
 
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
-    projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
+    projects: [{ name: '', location: '', hours: '', description: '', photos: [], confirmedShop: false, separationConfirmed: false }],
   })
 
   // Track uploading state per project
@@ -194,7 +221,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   const addProject = () =>
     setFormData(f => ({
       ...f,
-      projects: [...f.projects, { name: '', location: '', hours: '', description: '', photos: [] }],
+      projects: [...f.projects, { name: '', location: '', hours: '', description: '', photos: [], confirmedShop: false, separationConfirmed: false }],
     }))
 
   const removeProject = (idx) =>
@@ -230,6 +257,20 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
     const validProjects = formData.projects.filter(p => p.name && p.hours)
     if (validProjects.length === 0) {
       setError('Please add at least one project with a name and hours.')
+      setLoading(false)
+      return
+    }
+
+    // "Shop" requires the employee to confirm they were actually working in the shop
+    if (validProjects.some(p => isShopName(p.name) && !p.confirmedShop)) {
+      setError('Please confirm the "Shop" project — check the box to verify you were working in the shop.')
+      setLoading(false)
+      return
+    }
+
+    // Discourage lumping multiple jobs into one entry — each project must be logged separately
+    if (validProjects.some(p => looksLikeLumpedProjects(p, projectNames) && !p.separationConfirmed)) {
+      setError('It looks like one entry covers more than one project. Log each project separately with its own hours, or tick the box to confirm it really is a single project.')
       setLoading(false)
       return
     }
@@ -279,7 +320,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       // Reset
       setFormData({
         date: getPSTDate(),
-        projects: [{ name: '', location: '', hours: '', description: '', photos: [] }],
+        projects: [{ name: '', location: '', hours: '', description: '', photos: [], confirmedShop: false, separationConfirmed: false }],
       })
       clearSignature()
       setPhotoLoading({})
@@ -295,6 +336,8 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
   }
 
   const anyPhotoUploading = Object.values(photoLoading).some(Boolean)
+  const needsShopConfirm = formData.projects.some(p => isShopName(p.name) && p.hours && !p.confirmedShop)
+  const needsSeparationConfirm = formData.projects.some(p => p.hours && looksLikeLumpedProjects(p, projectNames) && !p.separationConfirmed)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -345,6 +388,10 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
             <Plus className="h-3.5 w-3.5" /> Add Project
           </button>
         </div>
+        <p className="text-xs text-gray-500 -mt-1">
+          Log each project separately with the hours worked on each. Don&apos;t combine multiple
+          jobs into one entry — tap <span className="font-medium text-blue-600">Add Project</span> for each.
+        </p>
 
         {formData.projects.map((project, idx) => (
           <div key={idx} className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
@@ -375,6 +422,38 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
               updateProject={updateProject}
               dropdownRefs={dropdownRefs}
             />
+
+            {/* Restricted name: "Shop" must be confirmed */}
+            {isShopName(project.name) && (
+              <label className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2.5 rounded-lg text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!project.confirmedShop}
+                  onChange={(e) => updateProject(idx, 'confirmedShop', e.target.checked)}
+                  className="w-4 h-4 accent-amber-600 flex-shrink-0 mt-0.5"
+                />
+                <span>
+                  Only log <strong>Shop</strong> if you were actually working in the shop.
+                  Check this box to confirm.
+                </span>
+              </label>
+            )}
+
+            {/* Possible lumping: notes look like they hide a second project */}
+            {looksLikeLumpedProjects(project, projectNames) && (
+              <label className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2.5 rounded-lg text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!project.separationConfirmed}
+                  onChange={(e) => updateProject(idx, 'separationConfirmed', e.target.checked)}
+                  className="w-4 h-4 accent-amber-600 flex-shrink-0 mt-0.5"
+                />
+                <span>
+                  This looks like more than one project. Please add each project on its own line
+                  with the hours worked on each — or check this box if it really is a single project.
+                </span>
+              </label>
+            )}
 
             <input
               type="text"
@@ -499,7 +578,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       {/* ── Submit ── */}
       <button
         type="submit"
-        disabled={loading || !hasSigned || anyPhotoUploading}
+        disabled={loading || !hasSigned || anyPhotoUploading || needsShopConfirm || needsSeparationConfirm}
         className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
       >
         {loading
@@ -508,6 +587,10 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
           ? 'Please sign first'
           : anyPhotoUploading
           ? 'Wait for photos to upload…'
+          : needsShopConfirm
+          ? 'Confirm the Shop project'
+          : needsSeparationConfirm
+          ? 'Separate the projects first'
           : 'Submit Hours'}
       </button>
     </form>
