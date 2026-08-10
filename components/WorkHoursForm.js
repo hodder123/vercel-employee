@@ -8,7 +8,7 @@ import { prepareImageForUpload } from '@/lib/prepareImage'
 
 const QUICK_HOURS = [1, 2, 4, 8]
 
-// "Shop" is a restricted project name — only valid when actually working in the
+// "Shop" is a restricted project name — only valid when actually working on the
 // shop, so we warn and require explicit confirmation before it can be logged.
 const isShopName = (name) => (name || '').trim().toLowerCase() === 'shop'
 
@@ -261,9 +261,9 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
       return
     }
 
-    // "Shop" requires the employee to confirm they were actually working in the shop
+    // "Shop" requires the employee to confirm they were actually working on the shop
     if (validProjects.some(p => isShopName(p.name) && !p.confirmedShop)) {
-      setError('Please confirm the "Shop" project — check the box to verify you were working in the shop.')
+      setError('Please confirm the "Shop" project — check the box to verify you were working on the shop.')
       setLoading(false)
       return
     }
@@ -433,7 +433,7 @@ export default function WorkHoursForm({ employeeId, employeeName }) {
                   className="w-4 h-4 accent-amber-600 flex-shrink-0 mt-0.5"
                 />
                 <span>
-                  Only log <strong>Shop</strong> if you were actually working in the shop.
+                  Only log <strong>Shop</strong> if you were actually working on the shop.
                   Check this box to confirm.
                 </span>
               </label>
