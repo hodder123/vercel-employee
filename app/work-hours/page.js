@@ -37,14 +37,24 @@ export default async function WorkHoursPage({ searchParams }) {
   const params = await searchParams
   const page = Math.max(1, parseInt(params?.page) || 1)
 
+  // Staff can only view entries from the past 3 days (today + previous 2 days, PST)
+  const todayPST = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
+  const cutoff = new Date(todayPST)
+  cutoff.setDate(cutoff.getDate() - 2)
+  const cutoffPST = cutoff.toISOString().split('T')[0]
+  const visibilityWhere = {
+    employeeId: employee.id,
+    date: { gte: new Date(cutoffPST + 'T00:00:00-08:00') }
+  }
+
   const totalEntries = await prisma.workHour.count({
-    where: { employeeId: employee.id }
+    where: visibilityWhere
   })
   const totalPages = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
 
   const workHours = await prisma.workHour.findMany({
-    where: { employeeId: employee.id },
+    where: visibilityWhere,
     orderBy: { date: 'desc' },
     skip: (currentPage - 1) * PAGE_SIZE,
     take: PAGE_SIZE
@@ -88,7 +98,7 @@ export default async function WorkHoursPage({ searchParams }) {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Recent Entries</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{totalEntries} total entries</p>
+                  <p className="text-sm text-muted-foreground mt-1">{totalEntries} entries from the past 3 days</p>
                 </div>
               </CardHeader>
               <CardContent>
