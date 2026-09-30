@@ -98,7 +98,7 @@ export default async function WorkHoursPage({ searchParams }) {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Recent Entries</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{totalEntries} entries from the past 3 days</p>
+                  <p className="text-sm text-muted-foreground mt-1">{totalEntries} total entries</p>
                 </div>
               </CardHeader>
               <CardContent>
