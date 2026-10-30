@@ -12,6 +12,20 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const fixJobId = searchParams.get('fixJobId')
+  const fixClientName = searchParams.get('fixClientName')
+  if (fixJobId && fixClientName) {
+    const client = await prisma.client.findFirst({ where: { name: fixClientName } })
+    if (!client) {
+      return NextResponse.json({ ok: false, error: 'client not found', fixClientName }, { status: 404 })
+    }
+    const job = await prisma.projectName.update({
+      where: { id: Number(fixJobId) },
+      data: { clientId: client.id },
+    })
+    return NextResponse.json({ ok: true, fixed: true, jobId: job.id, jobName: job.name, clientId: client.id, clientName: client.name })
+  }
+
   try {
     const nameToId = new Map()
     let clientsCreated = 0
