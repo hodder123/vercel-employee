@@ -40,11 +40,31 @@ model ProjectName {
   client      String?
   siteAddress String?   @map("site_address")
   status      String    @default("active") // active | ready_to_invoice | invoiced | paid
+  clientId    Int?      @map("client_id")
+  clientRecord Client?  @relation(fields: [clientId], references: [id])
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   receipts    Receipt[]
 
   @@map("project_names")
+}
+
+model Client {
+  id        Int           @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String?
+  phone2    String?
+  phone3    String?
+  company   String?
+  address   String?
+  notes     String?
+  source    String?       @default("manual")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  jobs      ProjectName[]
+
+  @@map("clients")
 }
 
 model Receipt {
