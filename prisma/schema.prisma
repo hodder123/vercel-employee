@@ -35,11 +35,33 @@ model Employee {
 }
 
 model ProjectName {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  client      String?
+  siteAddress String?   @map("site_address")
+  status      String    @default("active") // active | ready_to_invoice | invoiced | paid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  receipts    Receipt[]
 
   @@map("project_names")
+}
+
+model Receipt {
+  id         Int         @id @default(autoincrement())
+  projectId  Int         @map("project_id")
+  vendor     String?
+  amount     Float?
+  date       DateTime?
+  fileUrl    String      @map("file_url")
+  fileType   String?     @map("file_type")
+  fileName   String?     @map("file_name")
+  uploadedBy String?     @map("uploaded_by")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  project    ProjectName @relation(fields: [projectId], references: [id])
+
+  @@map("receipts")
 }
 
 model WorkHour {
