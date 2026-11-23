@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { ArrowLeft, Info, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Info, Megaphone, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const PAGE_SIZE = 5
 
@@ -32,6 +32,17 @@ export default async function WorkHoursPage({ searchParams }) {
 
   if (!employee) {
     return <div>Employee not found</div>
+  }
+
+  // Admin notices for this employee (never break the page if the table isn't there yet)
+  let notices = []
+  try {
+    notices = await prisma.notice.findMany({
+      where: { active: true, OR: [{ allEmployees: true }, { employeeIds: { has: employee.id } }] },
+      orderBy: { createdAt: 'desc' },
+    })
+  } catch (e) {
+    notices = []
   }
 
   const params = await searchParams
@@ -77,6 +88,16 @@ export default async function WorkHoursPage({ searchParams }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {notices.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {notices.map((n) => (
+              <div key={n.id} className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+                <Megaphone className="h-5 w-5 mt-0.5 shrink-0" />
+                <p className="whitespace-pre-wrap text-sm font-medium">{n.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Form */}
           <Card>

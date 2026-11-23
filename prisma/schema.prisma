@@ -104,3 +104,14 @@ model WorkHour {
 
   @@map("WorkHours")
 }
+model Notice {
+  id           Int      @id @default(autoincrement())
+  message      String
+  active       Boolean  @default(true)
+  allEmployees Boolean  @default(false) @map("all_employees")
+  employeeIds  String[] @map("employee_ids")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("notices")
+}

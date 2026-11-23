@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { LayoutDashboard, Users, FileSpreadsheet, Settings, LogOut, ChevronLeft, ChevronRight, Clock, CalendarDays, Briefcase } from 'lucide-react'
+import { LayoutDashboard, Users, FileSpreadsheet, Settings, LogOut, ChevronLeft, ChevronRight, Clock, CalendarDays, Briefcase, Megaphone } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 import { useState } from 'react'
 
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/all-work-hours', label: 'Users', icon: Users },
   { href: '/admin/jobs', label: 'Jobs', icon: Briefcase },
+  { href: '/admin/notices', label: 'Notices', icon: Megaphone },
   { href: '/admin/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/admin/send-report', label: 'Reports', icon: FileSpreadsheet },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
