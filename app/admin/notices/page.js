@@ -19,7 +19,6 @@ export default async function AdminNoticesPage() {
   }
 
   const employees = await prisma.employee.findMany({
-    where: { role: { not: 'admin' } },
     select: { id: true, name: true, fullName: true },
     orderBy: { name: 'asc' },
   })
